@@ -6,6 +6,10 @@ const isLoggedIn = ref(false);
 const errorMessage = ref("");
 const isPlaying = ref(false);
 const currentTrack = ref("");
+const playPauseHotkey = ref('');
+const nextTrackHotkey = ref('');
+const prevTrackHotkey = ref('');
+const isRecordingHotkey = ref('');
 
 interface AuthResult {
   NeedsAuth?: { url: string };
@@ -138,6 +142,66 @@ async function checkAuthStatus() {
   }
 }
 
+function handleKeyDown(e: KeyboardEvent, control: string) {
+  e.preventDefault();
+  
+  // Only record if we're actively recording for this control
+  if (isRecordingHotkey.value !== control) return;
+  
+  const keys: string[] = [];
+  if (e.ctrlKey) keys.push('Ctrl');
+  if (e.altKey) keys.push('Alt');
+  if (e.shiftKey) keys.push('Shift');
+  
+  // Add the main key if it's not a modifier
+  if (!['Control', 'Alt', 'Shift'].includes(e.key)) {
+    keys.push(e.key);
+  }
+  
+  const hotkeyString = keys.join(' + ');
+  
+  // Update the appropriate hotkey
+  switch (control) {
+    case 'playPause':
+      playPauseHotkey.value = hotkeyString;
+      break;
+    case 'nextTrack':
+      nextTrackHotkey.value = hotkeyString;
+      break;
+    case 'prevTrack':
+      prevTrackHotkey.value = hotkeyString;
+      break;
+  }
+}
+
+function startRecording(control: string) {
+  isRecordingHotkey.value = control;
+}
+
+function stopRecording() {
+  isRecordingHotkey.value = '';
+}
+
+async function saveHotkeys() {
+  try {
+    const result = await invoke<{ Success?: null; Error?: { message: string } }>(
+      "set_hotkeys",
+      {
+        playPause: playPauseHotkey.value,
+        nextTrack: nextTrackHotkey.value,
+        prevTrack: prevTrackHotkey.value,
+      }
+    );
+    
+    if (result.Error) {
+      errorMessage.value = result.Error.message;
+    }
+  } catch (error) {
+    console.error("Failed to save hotkeys:", error);
+    errorMessage.value = "Failed to save hotkeys";
+  }
+}
+
 onMounted(async () => {
   await checkAuthStatus();
   
@@ -166,6 +230,8 @@ onMounted(async () => {
     <!-- Logged-In Section with Playback Controls -->
     <div v-else class="logged-in">
       <h2>Spotify Player</h2>
+      
+      <!-- Existing playback controls -->
       <div class="playback-controls">
         <button @click="handlePrevTrack" class="control-button">
           ⏮️ Previous
@@ -177,6 +243,60 @@ onMounted(async () => {
           ⏭️ Next
         </button>
       </div>
+      
+      <!-- New Hotkey Configuration Form -->
+      <div class="hotkey-config">
+        <h3>Configure Hotkeys</h3>
+        <form @submit.prevent="saveHotkeys" class="hotkey-form">
+          <div class="hotkey-input-group">
+            <label for="playPauseHotkey">Play/Pause:</label>
+            <input
+              id="playPauseHotkey"
+              type="text"
+              :value="playPauseHotkey"
+              readonly
+              :class="{ 'recording': isRecordingHotkey === 'playPause' }"
+              @focus="startRecording('playPause')"
+              @blur="stopRecording"
+              @keydown="handleKeyDown($event, 'playPause')"
+              placeholder="Click to set hotkey"
+            />
+          </div>
+          
+          <div class="hotkey-input-group">
+            <label for="nextTrackHotkey">Next Track:</label>
+            <input
+              id="nextTrackHotkey"
+              type="text"
+              :value="nextTrackHotkey"
+              readonly
+              :class="{ 'recording': isRecordingHotkey === 'nextTrack' }"
+              @focus="startRecording('nextTrack')"
+              @blur="stopRecording"
+              @keydown="handleKeyDown($event, 'nextTrack')"
+              placeholder="Click to set hotkey"
+            />
+          </div>
+          
+          <div class="hotkey-input-group">
+            <label for="prevTrackHotkey">Previous Track:</label>
+            <input
+              id="prevTrackHotkey"
+              type="text"
+              :value="prevTrackHotkey"
+              readonly
+              :class="{ 'recording': isRecordingHotkey === 'prevTrack' }"
+              @focus="startRecording('prevTrack')"
+              @blur="stopRecording"
+              @keydown="handleKeyDown($event, 'prevTrack')"
+              placeholder="Click to set hotkey"
+            />
+          </div>
+          
+          <button type="submit" class="save-hotkeys-button">Save Hotkeys</button>
+        </form>
+      </div>
+      
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
   </div>
@@ -236,5 +356,58 @@ onMounted(async () => {
 
 .play-pause {
   min-width: 120px;
+}
+
+.hotkey-config {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #282828;
+  border-radius: 8px;
+}
+
+.hotkey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.hotkey-input-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hotkey-input-group input {
+  padding: 0.5rem;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  background-color: #181818;
+  color: white;
+  cursor: pointer;
+  width: 200px;
+}
+
+.hotkey-input-group input.recording {
+  border-color: #1DB954;
+  background-color: #2a2a2a;
+}
+
+.save-hotkeys-button {
+  background-color: #1DB954;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 1rem;
+  align-self: center;
+}
+
+.save-hotkeys-button:hover {
+  background-color: #1ed760;
 }
 </style>
