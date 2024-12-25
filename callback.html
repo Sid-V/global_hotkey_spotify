@@ -1,0 +1,7 @@
+<script>
+  const code = new URLSearchParams(window.location.search).get('code');
+  if (code && window.opener) {
+    window.opener.postMessage({ type: 'spotify-callback', code: code }, '*');
+    window.close();
+  }
+</script> 
