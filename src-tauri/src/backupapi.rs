@@ -16,12 +16,12 @@ const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
 
 #[derive(Default)]
-pub struct SpotifyAuthState {
+pub struct AppState {
     spotify: Mutex<Option<AuthCodeSpotify>>,
     cookie_jar: Mutex<CookieJar>,
 }
 
-pub impl Default for SpotifyAuthState {
+pub impl Default for AppState {
     fn default() -> Self {
         Self {
             spotify: Mutex::new(None),
@@ -72,7 +72,7 @@ pub fn init_spotify(jar:  &mut CookieJar) -> AuthCodeSpotify {
 
 
 #[tauri::command]
-pub async fn init_auth(state: State<'_, SpotifyAuthState> ) -> Result<Status, String> {
+pub async fn init_auth(state: State<'_, AppState> ) -> Result<Status, String> {
 
     let mut jar = state.cookie_jar.lock().map_err(|e| e.to_string())?;
     // The user is authenticated if their cookie is set and a cache exists for them.

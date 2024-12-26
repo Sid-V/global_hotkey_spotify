@@ -15,11 +15,11 @@ tauri = { version = "2.1.1", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-getrandom = "0.2.6"
+# Required for spotify api
 rspotify = { version = "0.13.3", default-features = false, features = ["client-reqwest", "env-file", "cli"] }
-rocket = { version = "0.5", features = ["json"] }
 tokio = "1.42.0"
-axum = "0.7.7"
-webbrowser = "1.0.2"
-warp = "0.3.7"
-flume = "0.11"
+
+# Required for hotkey
+global-hotkey = "0.6.3"
+keyboard-types = "0.7"
+parking_lot = "0.12"

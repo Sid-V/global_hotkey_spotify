@@ -155,7 +155,7 @@ function handleKeyDown(e: KeyboardEvent, control: string) {
   
   // Add the main key if it's not a modifier
   if (!['Control', 'Alt', 'Shift'].includes(e.key)) {
-    keys.push(e.key);
+    keys.push(e.key === ' ' ? 'SPACE' : e.key);
   }
   
   const hotkeyString = keys.join(' + ');
@@ -237,7 +237,7 @@ onMounted(async () => {
           ⏮️ Previous
         </button>
         <button @click="handlePlayPause" class="control-button play-pause">
-          {{ isPlaying ? "⏸️ Pause" : "▶️ Play" }}
+          ▶️⏸️ Play/Pause
         </button>
         <button @click="handleNextTrack" class="control-button">
           ⏭️ Next

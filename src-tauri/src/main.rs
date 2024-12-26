@@ -7,11 +7,46 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}, 
     Manager, Size, Position, LogicalPosition, LogicalSize, WindowEvent
 };
+use tokio::sync::Mutex;
+use rspotify::AuthCodeSpotify;
+use global_hotkey::GlobalHotKeyManager;
 
 use crate::api::*;
+use crate::hotkey::*;
 pub mod api;
+pub mod hotkey;
 
-// todo need to see how to do better callback
+// Add this wrapper struct
+pub struct ThreadSafeHotKeyManager(GlobalHotKeyManager);
+
+// Implement Send and Sync
+unsafe impl Send for ThreadSafeHotKeyManager {}
+unsafe impl Sync for ThreadSafeHotKeyManager {}
+
+impl ThreadSafeHotKeyManager {
+    pub fn new(manager: GlobalHotKeyManager) -> Self {
+        Self(manager)
+    }
+    
+    pub fn inner(&self) -> &GlobalHotKeyManager {
+        &self.0
+    }
+}
+
+// Main state of the app
+pub struct AppState {
+    pub spotify: Mutex<Option<AuthCodeSpotify>>,
+    pub hotkey_manager: Mutex<Option<ThreadSafeHotKeyManager>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            spotify: Mutex::new(Some(init_spotify())),
+            hotkey_manager: Mutex::new(Some(ThreadSafeHotKeyManager::new(init_hotkeys()))),
+        }
+    }
+}
 
 fn main() {
     tauri::Builder::default()
@@ -97,7 +132,7 @@ fn main() {
                 
                 Ok(())
         })
-        .manage(SpotifyAuthState::default())
+        .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             init_auth,
             handle_callback,
@@ -105,7 +140,8 @@ fn main() {
             me,
             play_pause,
             next_track,
-            prev_track
+            prev_track,
+            set_hotkeys
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

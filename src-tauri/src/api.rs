@@ -3,22 +3,20 @@ use rspotify::{
     prelude::*, 
     scopes, AuthCodeSpotify, Config, Credentials, OAuth, Token,
 };
-use tauri::{State, Url};
-use std::str::FromStr;
-use std::{env, fs, path::PathBuf, io, collections::HashMap};
+use tauri::State;
+use std::{
+    path::PathBuf,
+    net::TcpListener,
+    thread,
+    io::{Write, BufRead, BufReader},
+    sync::Once,
+};
 use serde::Serialize;
-use warp::Filter;
-use tokio::sync::Mutex;
-use std::net::TcpListener;
-use std::thread;
-use std::io::Write;
-use std::io::{BufRead, BufReader};
-use std::sync::Once;
+use crate::AppState;
+
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
-
-// Add this at the top with other statics
 static CALLBACK_SERVER: Once = Once::new();
 
 #[derive(Serialize)]
@@ -28,20 +26,9 @@ pub enum AuthResult {
     Error { message: String },
 }
 
-// Main state of the app
-pub struct SpotifyAuthState {
-    spotify: Mutex<Option<AuthCodeSpotify>>,
-}
 
-impl Default for SpotifyAuthState {
-    fn default() -> Self {
-        Self {
-            spotify: Mutex::new(Some(init_spotify())),            
-        }
-    }
-}
 
-fn init_spotify() -> AuthCodeSpotify {
+pub fn init_spotify() -> AuthCodeSpotify {
     let config = Config {
         token_cached: true,
         token_refreshing: true,
@@ -117,7 +104,7 @@ fn start_callback_server() {
 }
 
 #[tauri::command]
-pub async fn init_auth(state: State<'_, SpotifyAuthState>) -> Result<AuthResult, String> {
+pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String> {
 
     start_callback_server();
     
@@ -156,7 +143,7 @@ pub async fn init_auth(state: State<'_, SpotifyAuthState>) -> Result<AuthResult,
 
 #[tauri::command]
 pub async fn handle_callback(
-    state: State<'_, SpotifyAuthState>,
+    state: State<'_, AppState>,
     code: String,
 ) -> Result<AuthResult, String> {
     println!("Received code from vuejs : {}", code.clone());
@@ -190,7 +177,7 @@ pub async fn handle_callback(
 }
 
 #[tauri::command]
-pub async fn check_auth_status(state: State<'_, SpotifyAuthState>) -> Result<AuthResult, String> {
+pub async fn check_auth_status(state: State<'_, AppState>) -> Result<AuthResult, String> {
     let spotify_lock = state.spotify.lock().await;
     
     let spotify = spotify_lock.as_ref().unwrap();
@@ -213,7 +200,7 @@ pub async fn check_auth_status(state: State<'_, SpotifyAuthState>) -> Result<Aut
 
 // #[tauri::command]
 // pub async fn handle_callback(
-//     state: State<'_, SpotifyAuthState>, 
+//     state: State<'_, AppState>, 
 //     callback_url: String,
 // ) -> Result<String, String> {
 //     // Extract code from callback URL
@@ -245,7 +232,7 @@ pub async fn check_auth_status(state: State<'_, SpotifyAuthState>) -> Result<Aut
 
 
 #[tauri::command]
-pub async fn me(state: State<'_, SpotifyAuthState>) -> Result<Option<user::PrivateUser>, String> {
+pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>, String> {
     
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
@@ -258,7 +245,7 @@ pub async fn me(state: State<'_, SpotifyAuthState>) -> Result<Option<user::Priva
 }
 
 #[tauri::command]
-pub async fn play_pause(state: State<'_, SpotifyAuthState>) -> Result<AuthResult, String> {
+pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String> {
     
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
@@ -292,7 +279,7 @@ pub async fn play_pause(state: State<'_, SpotifyAuthState>) -> Result<AuthResult
 }
 
 #[tauri::command]
-pub async fn next_track(state: State<'_, SpotifyAuthState>) -> Result<AuthResult, String> {    
+pub async fn next_track(state: State<'_, AppState>) -> Result<AuthResult, String> {    
 
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
@@ -308,7 +295,7 @@ pub async fn next_track(state: State<'_, SpotifyAuthState>) -> Result<AuthResult
 }
 
 #[tauri::command]
-pub async fn prev_track(state: State<'_, SpotifyAuthState>) -> Result<AuthResult, String> {
+pub async fn prev_track(state: State<'_, AppState>) -> Result<AuthResult, String> {
     
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
@@ -322,61 +309,3 @@ pub async fn prev_track(state: State<'_, SpotifyAuthState>) -> Result<AuthResult
         })
     }
 }
-
-
-// Helper Functions
-
-// fn is_authenticated(jar: &CookieJar) -> bool {
-//     if jar.get("uuid").is_none() || !cache_path_exists(jar) {
-//         return false;
-//     }
-
-//     let cache_path = get_cache_path(jar);
-//     match Token::from_cache(&cache_path) {
-//         Ok(token) => !token.is_expired(),
-//         Err(_) => false,
-//     }
-// }
-
-// fn get_cache_path(jar: &CookieJar) -> PathBuf {
-//     let mut cache_path = env::current_dir().unwrap_or_default();
-//     cache_path.push(CACHE_PATH);
-    
-//     if let Some(uuid) = jar.get("uuid") {
-//         cache_path.push(uuid.value());
-//     }
-    
-//     cache_path
-// }
-
-// fn cache_path_exists(jar: &CookieJar) -> bool {
-//     get_cache_path(jar).exists()
-// }
-
-// fn create_cache_path_if_absent(jar: &CookieJar) -> PathBuf {
-//     let cache_path = get_cache_path(jar);
-//     if !cache_path.exists() {
-//         if let Some(parent) = cache_path.parent() {
-//             let _ = fs::create_dir_all(parent);
-//         }
-//     }
-//     cache_path
-// }
-
-// fn generate_random_uuid(length: usize) -> String {
-//     let alphanum: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-//     let mut buf = vec![0u8; length];
-//     if getrandom(&mut buf).is_ok() {
-//         buf.iter()
-//             .map(|byte| alphanum[*byte as usize % alphanum.len()] as char)
-//             .collect()
-//     } else {
-//         // Fallback to a timestamp-based ID if getrandom fails
-//         use std::time::{SystemTime, UNIX_EPOCH};
-//         SystemTime::now()
-//             .duration_since(UNIX_EPOCH)
-//             .unwrap_or_default()
-//             .as_nanos()
-//             .to_string()
-//     }
-// }
