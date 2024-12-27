@@ -149,12 +149,12 @@ function handleKeyDown(e: KeyboardEvent, control: string) {
   if (isRecordingHotkey.value !== control) return;
   
   const keys: string[] = [];
-  if (e.ctrlKey) keys.push('Ctrl');
-  if (e.altKey) keys.push('Alt');
-  if (e.shiftKey) keys.push('Shift');
+  if (e.ctrlKey) keys.push('CTRL');
+  if (e.altKey) keys.push('ALT');
+  if (e.shiftKey) keys.push('SHIFT');
   
   // Add the main key if it's not a modifier
-  if (!['Control', 'Alt', 'Shift'].includes(e.key)) {
+  if (!['CTRL', 'ALT', 'SHIFT'].includes(e.key)) {
     keys.push(e.key === ' ' ? 'SPACE' : e.key);
   }
   
@@ -184,12 +184,12 @@ function stopRecording() {
 
 async function saveHotkeys() {
   try {
-    const result = await invoke<{ Success?: null; Error?: { message: string } }>(
+    const result = await invoke<AuthResult>(
       "set_hotkeys",
       {
-        playPause: playPauseHotkey.value,
-        nextTrack: nextTrackHotkey.value,
-        prevTrack: prevTrackHotkey.value,
+        playPauseHotkey: playPauseHotkey.value,
+        nextTrackHotkey: nextTrackHotkey.value,
+        prevTrackHotkey: prevTrackHotkey.value,
       }
     );
     

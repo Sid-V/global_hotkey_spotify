@@ -23,3 +23,7 @@ tokio = "1.42.0"
 global-hotkey = "0.6.3"
 keyboard-types = "0.7"
 parking_lot = "0.12"
+lazy_static = "1.4.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"

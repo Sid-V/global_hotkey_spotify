@@ -1,19 +1,16 @@
+use crate::AppState;
 use rspotify::{
-    model::user, 
-    prelude::*, 
-    scopes, AuthCodeSpotify, Config, Credentials, OAuth, Token,
-};
-use tauri::State;
-use std::{
-    path::PathBuf,
-    net::TcpListener,
-    thread,
-    io::{Write, BufRead, BufReader},
-    sync::Once,
+    model::user, prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth, Token,
 };
 use serde::Serialize;
-use crate::AppState;
-
+use std::{
+    io::{BufRead, BufReader, Write},
+    net::TcpListener,
+    path::PathBuf,
+    sync::Once,
+    thread,
+};
+use tauri::State;
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
@@ -26,8 +23,6 @@ pub enum AuthResult {
     Error { message: String },
 }
 
-
-
 pub fn init_spotify() -> AuthCodeSpotify {
     let config = Config {
         token_cached: true,
@@ -35,7 +30,7 @@ pub fn init_spotify() -> AuthCodeSpotify {
         cache_path: PathBuf::from(".spotify_token.json"),
         ..Default::default()
     };
-    
+
     let api_scopes = scopes!(
         "user-read-email",
         "user-read-private",
@@ -46,9 +41,9 @@ pub fn init_spotify() -> AuthCodeSpotify {
         "user-read-playback-position",
         "user-modify-playback-state"
     );
-    
+
     let creds = Credentials::new(CLIENT_ID, CLIENT_SECRET);
-    
+
     let oauth = OAuth {
         scopes: api_scopes,
         redirect_uri: "http://localhost:8888/callback".to_owned(),
@@ -105,23 +100,24 @@ fn start_callback_server() {
 
 #[tauri::command]
 pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String> {
-
     start_callback_server();
-    
+
     let spotify_lock = state.spotify.lock().await;
-    
+
     let spotify = spotify_lock.as_ref().unwrap();
     // Check for existing token
     if let Ok(Some(token)) = spotify.read_token_cache(true).await {
         dbg!("Found token in cache: init_auth");
         *spotify.get_token().lock().await.unwrap() = Some(token.clone());
-        
+
         if token.is_expired() {
             dbg!("Token expired, attempting refresh");
             match spotify.refresh_token().await {
                 Ok(()) => {
                     dbg!("Token refreshed successfully");
-                    return Ok(AuthResult::Success { ok: "ok".to_string() });
+                    return Ok(AuthResult::Success {
+                        ok: "ok".to_string(),
+                    });
                 }
                 _ => {
                     // If refresh fails, proceed with new auth
@@ -130,15 +126,18 @@ pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String>
             }
         } else {
             // Token exists and is valid
-            return Ok(AuthResult::Success { ok: "ok".to_string() });
+            return Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            });
         }
     }
 
     // No valid token, start auth flow
     let url = spotify.get_authorize_url(true).unwrap();
-    
-    
-    Ok(AuthResult::NeedsAuth { url: url.to_string()})
+
+    Ok(AuthResult::NeedsAuth {
+        url: url.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -150,7 +149,8 @@ pub async fn handle_callback(
 
     // Get mutable access to Spotify client
     let mut spotify_lock = state.spotify.lock().await;
-    let spotify = spotify_lock.as_mut()
+    let spotify = spotify_lock
+        .as_mut()
         .ok_or_else(|| "Spotify client not initialized".to_string())?;
 
     // Request token using the authorization code
@@ -159,18 +159,23 @@ pub async fn handle_callback(
             println!("Successfully obtained token");
             // Successfully got token, try to cache it
             if let Some(token) = spotify.get_token().lock().await.unwrap().clone() {
-                println!("Attempting to cache token to: {:?}", spotify.config.cache_path);
+                println!(
+                    "Attempting to cache token to: {:?}",
+                    spotify.config.cache_path
+                );
                 match token.write_cache(&spotify.config.cache_path) {
                     Ok(_) => println!("Successfully cached token"),
-                    Err(e) => println!("Failed to cache token: {}", e)
+                    Err(e) => println!("Failed to cache token: {}", e),
                 }
             }
-            Ok(AuthResult::Success { ok: "ok".to_string() })
-        },
+            Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            })
+        }
         Err(e) => {
             println!("Token request failed with error: {:?}", e);
-            Ok(AuthResult::Error { 
-                message: format!("Failed to request token: {}", e) 
+            Ok(AuthResult::Error {
+                message: format!("Failed to request token: {}", e),
             })
         }
     }
@@ -179,28 +184,31 @@ pub async fn handle_callback(
 #[tauri::command]
 pub async fn check_auth_status(state: State<'_, AppState>) -> Result<AuthResult, String> {
     let spotify_lock = state.spotify.lock().await;
-    
+
     let spotify = spotify_lock.as_ref().unwrap();
     if let Ok(Some(token)) = spotify.read_token_cache(true).await {
         dbg!("Found token in cache: check auth status");
         *spotify.get_token().lock().await.unwrap() = Some(token.clone());
-        
+
         if token.is_expired() {
-            return Ok(AuthResult::Error { 
-                message: "Token expired".to_string() 
+            return Ok(AuthResult::Error {
+                message: "Token expired".to_string(),
             });
         } else {
-            return Ok(AuthResult::Success { ok: "ok".to_string() });
+            return Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            });
         }
     }
-    
-    Ok(AuthResult::Error { message: "No token found".to_string() })
 
+    Ok(AuthResult::Error {
+        message: "No token found".to_string(),
+    })
 }
 
 // #[tauri::command]
 // pub async fn handle_callback(
-//     state: State<'_, AppState>, 
+//     state: State<'_, AppState>,
 //     callback_url: String,
 // ) -> Result<String, String> {
 //     // Extract code from callback URL
@@ -230,13 +238,13 @@ pub async fn check_auth_status(state: State<'_, AppState>) -> Result<AuthResult,
 //     Ok("Successfully authenticated".to_string())
 // }
 
-
 #[tauri::command]
 pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>, String> {
-    
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
-        spotify.me().await
+        spotify
+            .me()
+            .await
             .map_err(|e| format!("Failed to get user info: {}", e))
             .map(Some)
     } else {
@@ -246,7 +254,6 @@ pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>,
 
 #[tauri::command]
 pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String> {
-    
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
         match spotify.current_playback(None, None::<Vec<_>>).await {
@@ -256,56 +263,64 @@ pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String
                 } else {
                     spotify.resume_playback(None, None).await
                 };
-                
+
                 match result {
-                    Ok(_) => Ok(AuthResult::Success { ok: "ok".to_string() }),
+                    Ok(_) => Ok(AuthResult::Success {
+                        ok: "ok".to_string(),
+                    }),
                     Err(e) => Ok(AuthResult::Error {
-                        message: format!("Playback control failed: {}", e)
-                    })
+                        message: format!("Playback control failed: {}", e),
+                    }),
                 }
-            },
+            }
             Ok(None) => Ok(AuthResult::Error {
-                message: "No active playback".to_string()
+                message: "No active playback".to_string(),
             }),
             Err(e) => Ok(AuthResult::Error {
-                message: format!("Failed to get playback state: {}", e)
-            })
+                message: format!("Failed to get playback state: {}", e),
+            }),
         }
     } else {
         Ok(AuthResult::Error {
-            message: "Spotify client not initialized".to_string()
+            message: "Spotify client not initialized".to_string(),
         })
     }
 }
 
 #[tauri::command]
-pub async fn next_track(state: State<'_, AppState>) -> Result<AuthResult, String> {    
-
+pub async fn next_track(state: State<'_, AppState>) -> Result<AuthResult, String> {
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
         match spotify.next_track(None).await {
-            Ok(_) => Ok(AuthResult::Success { ok: "ok".to_string() }),
-            Err(e) => Ok(AuthResult::Error { message: format!("Next Track failed: {}", e) })
+            Ok(_) => Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            }),
+            Err(e) => Ok(AuthResult::Error {
+                message: format!("Next Track failed: {}", e),
+            }),
         }
     } else {
         Ok(AuthResult::Error {
-            message: "No active playback".to_string()
+            message: "No active playback".to_string(),
         })
     }
 }
 
 #[tauri::command]
 pub async fn prev_track(state: State<'_, AppState>) -> Result<AuthResult, String> {
-    
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
         match spotify.previous_track(None).await {
-            Ok(_) => Ok(AuthResult::Success { ok: "ok".to_string() }),
-            Err(e) => Ok(AuthResult::Error { message: format!("Next Track failed: {}", e) })
+            Ok(_) => Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            }),
+            Err(e) => Ok(AuthResult::Error {
+                message: format!("Next Track failed: {}", e),
+            }),
         }
     } else {
         Ok(AuthResult::Error {
-            message: "No active playback".to_string()
+            message: "No active playback".to_string(),
         })
     }
 }
