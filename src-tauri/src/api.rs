@@ -1,6 +1,6 @@
 use crate::AppState;
 use rspotify::{
-    model::user, prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth, Token,
+    model::user, prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth
 };
 use serde::Serialize;
 use std::{
@@ -254,6 +254,8 @@ pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>,
 
 #[tauri::command]
 pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String> {
+    println!("play_pause command called");
+    
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
         match spotify.current_playback(None, None::<Vec<_>>).await {

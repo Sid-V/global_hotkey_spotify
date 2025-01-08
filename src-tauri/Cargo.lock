@@ -3148,10 +3148,12 @@ dependencies = [
 name = "spotify-tauri"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "global-hotkey",
  "keyboard-types",
  "lazy_static",
  "parking_lot",
+ "rand 0.8.5",
  "rspotify",
  "serde",
  "serde_json",

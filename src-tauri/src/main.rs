@@ -9,7 +9,8 @@ use tauri::{
 };
 use tokio::sync::Mutex;
 use rspotify::AuthCodeSpotify;
-use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use global_hotkey::{GlobalHotKeyEvent, HotKeyState, hotkey::{Code, HotKey}, GlobalHotKeyManager};
+use tokio::runtime::Runtime;
 
 use crate::api::*;
 use crate::hotkey::*;
@@ -17,9 +18,10 @@ pub mod api;
 pub mod hotkey;
 
 // Main state of the app
+
 pub struct AppState {
     pub spotify: tokio::sync::Mutex<Option<AuthCodeSpotify>>,
-    pub hotkey_manager: std::sync::Mutex<HotkeyManager>,
+    //pub hotkey_manager: std::sync::Mutex<GlobalHotKeyManager>,
 }
 
 // Implement Default for AppState
@@ -27,7 +29,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             spotify: Mutex::new(Some(init_spotify())),
-            hotkey_manager: std::sync::Mutex::new(HotkeyManager::new()),
+            //hotkey_manager: std::sync::Mutex::new(GlobalHotKeyManager::new().unwrap()),
         }
     }
 }
@@ -113,55 +115,24 @@ fn main() {
                 })
                 .build(app);
             
-                
+                let app_handle_for_hotkey = app.app_handle().clone();    
+                init_hotkeys(app.state(), app_handle_for_hotkey);
                 // Spawn a background task to handle hotkey events
-                let app_handle = app.app_handle().clone();
-                let app_handle2 = app_handle.clone();
-                std::thread::spawn(move || {
-                    println!("Starting hotkey event listener thread");
-                    let global_hotkey_channel = GlobalHotKeyEvent::receiver();
-                    println!("Hotkey channel created");
-                    
-                    while let Ok(event) = global_hotkey_channel.recv() {
-                        println!("Received hotkey event: {:?}", event);
-                        if event.state == HotKeyState::Released {
-                            println!("Hotkey released: {}", event.id);
-                            if let Ok(manager) = app_handle.state::<AppState>().hotkey_manager.lock() {
-                                println!("Current registered hotkeys: {:?}", manager.hotkeys);
-                                for (name, hotkey) in &manager.hotkeys {
-                                    println!("Checking hotkey {} with id {}", name, hotkey.id());
-                                    if hotkey.id() == event.id {
-                                        println!("Found matching hotkey: {}", name);
-                                        match name.as_str() {
-                                            "play_pause" => {
-                                                println!("Play/Pause triggered");
-                                                let _ = play_pause(app_handle.state());
-                                            },
-                                            "next_track" => {
-                                                println!("Next track triggered"); 
-                                                let _ = next_track(app_handle.state());
-                                            },
-                                            "prev_track" => {
-                                                println!("Previous track triggered");
-                                                let _ = prev_track(app_handle.state());
-                                            },
-                                            _ => println!("Unknown hotkey triggered"),
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    println!("Hotkey event listener thread ended");
-                });
-            
-                // Test hotkey (temporary)
-                use global_hotkey::hotkey::{HotKey, Modifiers, Code};
-                let test_hotkey = HotKey::new(Some(Modifiers::CONTROL), Code::KeyL);
-                println!("main.rs Hotkey created: {:?}", HotKey::new(Some(Modifiers::CONTROL), Code::KeyL));
-                app_handle2.state::<AppState>().hotkey_manager.lock().unwrap().register("test".to_string(), test_hotkey).expect("Failed to register test hotkey");
-                println!("Test hotkey registered: Ctrl+L");
-            
+
+
+
+                // Initialize default hotkeys
+                // let default_play_pause = HotKey::new(None, Code::F7);
+                // let default_next_track = HotKey::new(None, Code::F8);
+                // let default_prev_track = HotKey::new(None, Code::F9);
+
+                // if let Ok(mut manager) = app_handle3.state::<AppState>().hotkey_manager.lock() {
+                //     manager.register_hotkey("play_pause".to_string(), default_play_pause).unwrap();
+                //     manager.register_hotkey("next_track".to_string(), default_next_track).unwrap();
+                //     manager.register_hotkey("prev_track".to_string(), default_prev_track).unwrap();
+                // }
+                
+
                 Ok(())
         })
         .manage(AppState::default())
