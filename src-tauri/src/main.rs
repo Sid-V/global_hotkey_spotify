@@ -37,7 +37,8 @@ impl Default for AppState {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-
+            let app_handle_for_hotkey = app.app_handle().clone();    
+            init_hotkeys(app_handle_for_hotkey);
             /* system tray setup */
             let quit = MenuItemBuilder::new("Quit").id("quit").build(app).unwrap();
             let show = MenuItemBuilder::new("Show").id("show").build(app).unwrap();         
@@ -115,8 +116,7 @@ fn main() {
                 })
                 .build(app);
             
-                let app_handle_for_hotkey = app.app_handle().clone();    
-                init_hotkeys(app.state(), app_handle_for_hotkey);
+
                 // Spawn a background task to handle hotkey events
 
 
