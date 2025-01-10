@@ -1183,7 +1183,6 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "once_cell",
- "serde",
  "thiserror 1.0.69",
  "windows-sys 0.59.0",
  "x11-dl",
@@ -3151,15 +3150,12 @@ dependencies = [
  "crossbeam-channel",
  "global-hotkey",
  "keyboard-types",
- "lazy_static",
- "parking_lot",
  "rand 0.8.5",
  "rspotify",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
- "tauri-plugin-global-shortcut",
  "tokio",
 ]
 
@@ -3456,38 +3452,6 @@ dependencies = [
  "syn 2.0.91",
  "tauri-codegen",
  "tauri-utils",
-]
-
-[[package]]
-name = "tauri-plugin"
-version = "2.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e753f2a30933a9bbf0a202fa47d7cc4a3401f06e8d6dcc53b79aa62954828c79"
-dependencies = [
- "anyhow",
- "glob",
- "plist",
- "schemars",
- "serde",
- "serde_json",
- "tauri-utils",
- "toml 0.8.2",
- "walkdir",
-]
-
-[[package]]
-name = "tauri-plugin-global-shortcut"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00f646a09511e8d283267dcdaa08c2ef27c4116bf271d9114849d9ca215606c3"
-dependencies = [
- "global-hotkey",
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.9",
 ]
 
 [[package]]

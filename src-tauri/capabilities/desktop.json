@@ -9,6 +9,5 @@
     "main"
   ],
   "permissions": [
-    "global-shortcut:default"
   ]
 }

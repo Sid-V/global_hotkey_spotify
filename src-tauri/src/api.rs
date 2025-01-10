@@ -14,7 +14,7 @@ use tauri::State;
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
-static CALLBACK_SERVER: Once = Once::new();
+static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
 
 #[derive(Serialize)]
 pub enum AuthResult {
@@ -100,6 +100,7 @@ fn start_callback_server() {
 
 #[tauri::command]
 pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String> {
+    
     start_callback_server();
 
     let spotify_lock = state.spotify.lock().await;
@@ -132,7 +133,7 @@ pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String>
         }
     }
 
-    // No valid token, start auth flow
+    // No valid token, start new auth flow
     let url = spotify.get_authorize_url(true).unwrap();
 
     Ok(AuthResult::NeedsAuth {
@@ -206,38 +207,10 @@ pub async fn check_auth_status(state: State<'_, AppState>) -> Result<AuthResult,
     })
 }
 
-// #[tauri::command]
-// pub async fn handle_callback(
-//     state: State<'_, AppState>,
-//     callback_url: String,
-// ) -> Result<String, String> {
-//     // Extract code from callback URL
-//     let parsed_url = Url::parse(&callback_url).map_err(|e| format!("Invalid URL: {}", e))?;
-//     let code = parsed_url.query_pairs()
-//         .find(|(key, _)| key == "code")
-//         .map(|(_, value)| value.to_string())
-//         .ok_or_else(|| "Missing code parameter".to_string())?;
 
-//     // Get Spotify client and request token
-//     let mut spotify_lock = state.spotify.lock().await;
-//     let spotify = spotify_lock
-//         .as_mut()
-//         .ok_or_else(|| "Spotify client not initialized".to_string())?;
-
-//     spotify
-//         .request_token(&code)
-//         .await
-//         .map_err(|e| format!("Failed to request token: {}", e))?;
-
-//     // Cache the token
-//     if let Some(token) = spotify.token.lock().await.unwrap().clone() {
-//         token.write_cache(&spotify.config.cache_path)
-//             .map_err(|e| format!("Failed to write token to cache: {}", e))?;
-//     }
-
-//     Ok("Successfully authenticated".to_string())
-// }
-
+//
+// SPOTIFY API PLAYBACK FUNCTIONS
+//
 #[tauri::command]
 pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>, String> {
     let spotify = state.spotify.lock().await;
@@ -254,8 +227,6 @@ pub async fn me(state: State<'_, AppState>) -> Result<Option<user::PrivateUser>,
 
 #[tauri::command]
 pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String> {
-    println!("play_pause command called");
-    
     let spotify = state.spotify.lock().await;
     if let Some(spotify) = &*spotify {
         match spotify.current_playback(None, None::<Vec<_>>).await {

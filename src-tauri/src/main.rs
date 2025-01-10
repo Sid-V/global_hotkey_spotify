@@ -2,6 +2,7 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+
 use tauri::{
     menu::{ MenuBuilder, MenuItemBuilder}, 
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}, 
@@ -9,8 +10,8 @@ use tauri::{
 };
 use tokio::sync::Mutex;
 use rspotify::AuthCodeSpotify;
-use global_hotkey::{GlobalHotKeyEvent, HotKeyState, hotkey::{Code, HotKey}, GlobalHotKeyManager};
-use tokio::runtime::Runtime;
+use global_hotkey::hotkey::HotKey;
+use std::collections::HashMap;
 
 use crate::api::*;
 use crate::hotkey::*;
@@ -18,10 +19,9 @@ pub mod api;
 pub mod hotkey;
 
 // Main state of the app
-
 pub struct AppState {
     pub spotify: tokio::sync::Mutex<Option<AuthCodeSpotify>>,
-    //pub hotkey_manager: std::sync::Mutex<GlobalHotKeyManager>,
+    pub hotkey_hashmap: tokio::sync::Mutex<Option<HashMap<String, HotKey>>>
 }
 
 // Implement Default for AppState
@@ -29,7 +29,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             spotify: Mutex::new(Some(init_spotify())),
-            //hotkey_manager: std::sync::Mutex::new(GlobalHotKeyManager::new().unwrap()),
+            hotkey_hashmap: Mutex::new(Some(HashMap::new()))
         }
     }
 }
@@ -37,9 +37,12 @@ impl Default for AppState {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            
+            // Setup hotkeys manager
             let app_handle_for_hotkey = app.app_handle().clone();    
             init_hotkeys(app_handle_for_hotkey);
-            /* system tray setup */
+
+            // system tray setup
             let quit = MenuItemBuilder::new("Quit").id("quit").build(app).unwrap();
             let show = MenuItemBuilder::new("Show").id("show").build(app).unwrap();         
             let menuitems = MenuBuilder::new(app)
@@ -115,23 +118,6 @@ fn main() {
                     _ => {}
                 })
                 .build(app);
-            
-
-                // Spawn a background task to handle hotkey events
-
-
-
-                // Initialize default hotkeys
-                // let default_play_pause = HotKey::new(None, Code::F7);
-                // let default_next_track = HotKey::new(None, Code::F8);
-                // let default_prev_track = HotKey::new(None, Code::F9);
-
-                // if let Ok(mut manager) = app_handle3.state::<AppState>().hotkey_manager.lock() {
-                //     manager.register_hotkey("play_pause".to_string(), default_play_pause).unwrap();
-                //     manager.register_hotkey("next_track".to_string(), default_next_track).unwrap();
-                //     manager.register_hotkey("prev_track".to_string(), default_prev_track).unwrap();
-                // }
-                
 
                 Ok(())
         })
