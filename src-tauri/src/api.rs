@@ -14,6 +14,7 @@ use tauri::State;
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
+const SPOTIFY_TOKEN_CACHE: &str = ".spotify_token.json";
 static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
 
 #[derive(Serialize)]
@@ -27,7 +28,7 @@ pub fn init_spotify() -> AuthCodeSpotify {
     let config = Config {
         token_cached: true,
         token_refreshing: true,
-        cache_path: PathBuf::from(".spotify_token.json"),
+        cache_path: PathBuf::from(SPOTIFY_TOKEN_CACHE),
         ..Default::default()
     };
 

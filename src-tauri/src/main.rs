@@ -11,13 +11,14 @@ use tauri::{
 use tokio::sync::Mutex;
 use rspotify::AuthCodeSpotify;
 use global_hotkey::hotkey::HotKey;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::api::*;
 use crate::hotkey::*;
 pub mod api;
 pub mod hotkey;
 
+pub const HOTKEY_CACHE: &str = ".hotkey_cache.json";
 // Main state of the app
 pub struct AppState {
     pub spotify: tokio::sync::Mutex<Option<AuthCodeSpotify>>,
@@ -38,9 +39,21 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             
+            // TODO - Create a separate hotkey save method without using the state and making it synchronous
             // Setup hotkeys manager
-            let app_handle_for_hotkey = app.app_handle().clone();    
+            let app_handle_for_hotkey = app.app_handle().clone();
+            let app_handle_for_hotkey2 = app.app_handle().clone();
             init_hotkeys(app_handle_for_hotkey);
+
+            // If hotkeys are found in the cache, restore them
+            let loaded_hotkeys = load_hotkeys_from_cache(PathBuf::from(HOTKEY_CACHE));
+            let loaded_hotkeys: Vec<String> = loaded_hotkeys.values().cloned().collect();
+            if loaded_hotkeys.len() == 3 {
+                //set_hotkeys(app_handle_for_hotkey2, app_handle_for_hotkey2.state().clone(), loaded_hotkeys[0].clone(), loaded_hotkeys[1].clone(), loaded_hotkeys[2].clone(), false).await;
+            }
+
+            // Send back the string to the app vue to show as the default string
+
 
             // system tray setup
             let quit = MenuItemBuilder::new("Quit").id("quit").build(app).unwrap();

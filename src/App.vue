@@ -5,7 +5,6 @@ import { ref, onMounted } from "vue";
 const isLoggedIn = ref(false);
 const errorMessage = ref("");
 const isPlaying = ref(false);
-const currentTrack = ref("");
 const playPauseHotkey = ref('');
 const nextTrackHotkey = ref('');
 const prevTrackHotkey = ref('');
@@ -13,7 +12,7 @@ const isRecordingHotkey = ref('');
 
 interface AuthResult {
   NeedsAuth?: { url: string };
-  Success?: {ok: string}; // Hacky: Will always be 'ok'
+  Success?: {ok: string}; // Hacky: Will always be string 'ok'
   Error?: { message: string };
 }
 
@@ -190,6 +189,7 @@ async function saveHotkeys() {
         playPauseHotkey: playPauseHotkey.value,
         nextTrackHotkey: nextTrackHotkey.value,
         prevTrackHotkey: prevTrackHotkey.value,
+        saveHotkey: true
       }
     );
     

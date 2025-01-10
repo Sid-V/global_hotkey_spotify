@@ -4,18 +4,56 @@ use global_hotkey::{
     GlobalHotKeyEvent, 
     HotKeyState
 };
-use std::{collections::HashMap, cell::RefCell};
+use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, fs};
 use tauri::{Manager, State};
 use crossbeam_channel::TryRecvError;
 use std::time::Duration;
 
 use crate::{api::AuthResult, next_track, play_pause, prev_track};
 use crate::AppState;
+use crate::HOTKEY_CACHE;
 
 // Hotkey manager needs to be declared in the same thread as the registration of hotkeys
 // So reinforcing that fact that making it thread_local and registering only in the main thread
 thread_local! {
     pub static HOTKEY_MANAGER: RefCell<Option<GlobalHotKeyManager>> = RefCell::new(None);
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct HotkeyCache {
+    string_hotkeys: HashMap<String, String>
+}
+
+impl HotkeyCache {
+    fn save_to_file(&self, path: PathBuf) -> Result<(), String> {
+        let data = serde_json::to_string(self).map_err(|e| e.to_string())?;
+        fs::write(path, data).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn load_from_file(path: PathBuf) -> Result<Self, String> {
+        let data = fs::read_to_string(path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&data).map_err(|e| e.to_string())
+    }
+}
+
+// Function to save reversed hotkeys
+pub fn save_hotkeys_to_cache(
+    string_hotkeys: HashMap<String, String>,
+    cache_file_path: PathBuf,
+) -> Result<(), String> {
+    let cache = HotkeyCache { string_hotkeys };
+    cache.save_to_file(cache_file_path)
+}
+
+// Function to load reversed hotkeys on app boot
+pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, String> {
+    if let Ok(cache) = HotkeyCache::load_from_file(cache_file_path) {
+        cache.string_hotkeys
+    } else {
+        HashMap::new() // Return an empty map if loading fails
+    }
 }
 
 #[tauri::command]
@@ -25,8 +63,21 @@ pub async fn set_hotkeys(
     play_pause_hotkey: String,
     next_track_hotkey: String,
     prev_track_hotkey: String,
+    save_hotkey: bool
 ) -> Result<AuthResult, String> {
-    let new_hotkeys = get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey)?;
+
+    // Store these hotkeys in a new hashmap
+    // TODO - need to check if they are empty and skip otherwise
+    if save_hotkey {
+        let mut save_hotkeys = HashMap::new();
+        save_hotkeys.insert("play_pause".to_string(), play_pause_hotkey.clone());
+        save_hotkeys.insert("next_track".to_string(), next_track_hotkey.clone());
+        save_hotkeys.insert("prev_track".to_string(), prev_track_hotkey.clone());
+
+        let _ = save_hotkeys_to_cache(save_hotkeys, PathBuf::from(HOTKEY_CACHE));
+    }
+
+    let new_hotkeys: HashMap<String, HotKey> = get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey)?;
     println!("New hotkeys received: {:?}", new_hotkeys);
     
     let cloned_new_hotkeys = new_hotkeys.clone();
@@ -41,10 +92,10 @@ pub async fn set_hotkeys(
 
         let _ = app_handle.run_on_main_thread(move || {
             HOTKEY_MANAGER.with(|manager| {
-                if let Some(testmanager) = manager.borrow().as_ref() {
+                if let Some(hotkey_manager) = manager.borrow().as_ref() {
                     // Unregister old hotkeys
                     for (name, hotkey) in old_hotkeys {
-                        if let Err(e) = testmanager.unregister(hotkey) {
+                        if let Err(e) = hotkey_manager.unregister(hotkey) {
                             println!("Failed to unregister hotkey '{}': {}", name, e);
                         } else {
                             println!("Unregistered hotkey '{}'", name);
@@ -53,7 +104,7 @@ pub async fn set_hotkeys(
 
                     // Register new hotkeys
                     for (name, hotkey) in cloned_new_hotkeys {
-                        if let Err(e) = testmanager.register(hotkey) {
+                        if let Err(e) = hotkey_manager.register(hotkey) {
                             println!("Failed to register hotkey '{}': {}", name, e);
                         } else {
                             println!("Registered hotkey '{}', {:?}", name, hotkey);
@@ -127,12 +178,10 @@ fn parse_hotkey(hotkey_str: &str) -> Result<HotKey, String> {
 }
 
 pub fn init_hotkeys(app_handle: tauri::AppHandle) {
-    println!("Initializing hotkey manager...");
-    println!("Thread ID in init_hotkeys: {:?}", std::thread::current().id());
-    let testmanager = GlobalHotKeyManager::new().expect("Failed to initialize new test manager");
+    let manager = GlobalHotKeyManager::new().expect("Failed to initialize new test manager");
     HOTKEY_MANAGER.with(|m| {
         println!("Accessing HOTKEY_MANAGER in thread: {:?}", std::thread::current().id());
-        *m.borrow_mut() = Some(testmanager)
+        *m.borrow_mut() = Some(manager)
     });
 
     let app_handle_for_hotkey = app_handle.clone();
