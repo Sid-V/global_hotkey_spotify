@@ -39,13 +39,9 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             
-            // TODO - Create a separate hotkey save method without using the state and making it synchronous
             // Setup hotkeys manager
             let app_handle_for_hotkey = app.app_handle().clone();
             init_hotkeys(app_handle_for_hotkey);
-
-            // Send back the string to the app vue to show as the default string
-
 
             // system tray setup
             let quit = MenuItemBuilder::new("Quit").id("quit").build(app).unwrap();
