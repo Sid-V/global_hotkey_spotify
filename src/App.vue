@@ -196,6 +196,10 @@ async function saveHotkeys() {
     if (result.Error) {
       errorMessage.value = result.Error.message;
     }
+    else
+    {
+      //TODO - Need to return the value of the hotkeys in the result
+    }
   } catch (error) {
     console.error("Failed to save hotkeys:", error);
     errorMessage.value = "Failed to save hotkeys";

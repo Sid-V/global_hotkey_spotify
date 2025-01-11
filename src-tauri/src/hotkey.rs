@@ -1,8 +1,5 @@
 use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyManager,
-    GlobalHotKeyEvent, 
-    HotKeyState
+    hotkey::{self, Code, HotKey, Modifiers}, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState
 };
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, fs};
@@ -48,9 +45,23 @@ pub fn save_hotkeys_to_cache(
 }
 
 // Function to load reversed hotkeys on app boot
-pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, String> {
+pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, HotKey> {
     if let Ok(cache) = HotkeyCache::load_from_file(cache_file_path) {
-        cache.string_hotkeys
+        let mut hotkey_map: HashMap<String, HotKey> = HashMap::new();
+        let string_hotkeys = cache.string_hotkeys;
+        for (name, hotkey_str) in string_hotkeys {
+            match parse_hotkey(&hotkey_str) {
+                Ok(hotkey) => {
+                    hotkey_map.insert(name, hotkey);
+                }
+                Err(e) => {
+                    println!("Failed to parse hotkey '{}': {}", hotkey_str, e);
+                    // Handle the error as needed (e.g., log it, skip it, etc.)
+                }
+            }
+        }
+    
+        hotkey_map
     } else {
         HashMap::new() // Return an empty map if loading fails
     }
@@ -177,12 +188,49 @@ fn parse_hotkey(hotkey_str: &str) -> Result<HotKey, String> {
     Ok(hotkey)
 }
 
+
 pub fn init_hotkeys(app_handle: tauri::AppHandle) {
     let manager = GlobalHotKeyManager::new().expect("Failed to initialize new test manager");
     HOTKEY_MANAGER.with(|m| {
         println!("Accessing HOTKEY_MANAGER in thread: {:?}", std::thread::current().id());
         *m.borrow_mut() = Some(manager)
     });
+
+    let loaded_hotkey_app_handle = app_handle.clone();
+    // Load hotkeys from cache, if it exists
+    let loaded_hotkeys = load_hotkeys_from_cache(PathBuf::from(HOTKEY_CACHE));
+    let cloned_loaded_hotkeys = loaded_hotkeys.clone();
+    if !loaded_hotkeys.is_empty() {
+        // Lock the hotkey_hashmap and extract data before entering the main thread logic
+
+        let _ = app_handle.run_on_main_thread(move || {
+            HOTKEY_MANAGER.with(|manager| {
+                if let Some(hotkey_manager) = manager.borrow().as_ref() {
+                    // Register hotkeys
+                    for (name, hotkey) in loaded_hotkeys {
+                        if let Err(e) = hotkey_manager.register(hotkey) {
+                            println!("Failed to register hotkey '{}': {}", name, e);
+                        } else {
+                            println!("Registered hotkey '{}', {:?}", name, hotkey);
+                        }
+                    }
+                } else {
+                    println!("HOTKEY_MANAGER is not initialized!");
+                }
+            });
+        });
+
+
+        tauri::async_runtime::spawn(async move {
+        println!("adding loaded hotkeys to hotkey_map");
+        let app_state = loaded_hotkey_app_handle.state::<AppState>();
+        let mut hotkey_map_guard = app_state.hotkey_hashmap.lock().await;
+        if let Some(hotkey_map) = hotkey_map_guard.as_mut() {
+            hotkey_map.extend(cloned_loaded_hotkeys);
+        }
+        });
+
+    }
 
     let app_handle_for_hotkey = app_handle.clone();
     // Start new thread to listen to hotkey events
