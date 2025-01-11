@@ -68,6 +68,17 @@ pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, HotK
 }
 
 #[tauri::command]
+pub async fn return_loaded_hotkeys(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, String>, String> {
+    match HotkeyCache::load_from_file(PathBuf::from(HOTKEY_CACHE)) {
+        Ok(cache) => Ok(cache.string_hotkeys),
+        Err(e) => Err(format!("Failed to load hotkeys: {}", e)),
+    }
+}
+
+#[tauri::command]
 pub async fn set_hotkeys(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,

@@ -135,7 +135,8 @@ fn main() {
             play_pause,
             next_track,
             prev_track,
-            set_hotkeys
+            set_hotkeys,
+            return_loaded_hotkeys
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

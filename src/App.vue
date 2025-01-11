@@ -16,6 +16,12 @@ interface AuthResult {
   Error?: { message: string };
 }
 
+interface Hotkeys {
+  play_pause: string;
+  next_track: string;
+  prev_track: string;
+}
+
 async function handleAuth() {
   // First check if we already have valid auth
   try {
@@ -141,6 +147,18 @@ async function checkAuthStatus() {
   }
 }
 
+async function loadPersistedHotkeys() {
+  try {
+    const hotkeys = await invoke<Hotkeys>("return_loaded_hotkeys");
+    playPauseHotkey.value = hotkeys["play_pause"] || '';
+    nextTrackHotkey.value = hotkeys["next_track"] || '';
+    prevTrackHotkey.value = hotkeys["prev_track"] || '';
+  } catch (error) {
+    console.error("Failed to load hotkeys:", error);
+    errorMessage.value = "Failed to load hotkeys";
+  }
+}
+
 function handleKeyDown(e: KeyboardEvent, control: string) {
   e.preventDefault();
   
@@ -196,10 +214,7 @@ async function saveHotkeys() {
     if (result.Error) {
       errorMessage.value = result.Error.message;
     }
-    else
-    {
-      //TODO - Need to return the value of the hotkeys in the result
-    }
+
   } catch (error) {
     console.error("Failed to save hotkeys:", error);
     errorMessage.value = "Failed to save hotkeys";
@@ -208,6 +223,7 @@ async function saveHotkeys() {
 
 onMounted(async () => {
   await checkAuthStatus();
+  await loadPersistedHotkeys();
   
   // Check auth status every 5 mins
   setInterval(async () => {
