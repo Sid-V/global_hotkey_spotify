@@ -43,7 +43,7 @@ async function handleAuth() {
 
     if (result.NeedsAuth) {
       console.log("Opening auth window with URL:", result.NeedsAuth.url);
-      const authWindow = window.open(result.NeedsAuth.url, "_blank");
+      window.open(result.NeedsAuth.url, "_blank");
       
       // Listen for the code from the callback window
       window.addEventListener('message', async function handleCallback(event) {
