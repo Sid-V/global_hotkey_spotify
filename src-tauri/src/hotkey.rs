@@ -1,15 +1,16 @@
 use global_hotkey::{
-    hotkey::{self, Code, HotKey, Modifiers}, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState
+    hotkey::{Code, HotKey, Modifiers},
+    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
 };
-use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, fs};
-use tauri::{Manager, State};
 use crossbeam_channel::TryRecvError;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::{cell::RefCell, collections::HashMap, fs, path::PathBuf};
+use tauri::{Manager, State};
 
-use crate::{api::AuthResult, next_track, play_pause, prev_track};
-use crate::AppState;
+use crate::{AppState, APP_CACHE_DIR};
 use crate::HOTKEY_CACHE;
+use crate::{api::AuthResult, next_track, play_pause, prev_track};
 
 // Hotkey manager needs to be declared in the same thread as the registration of hotkeys
 // So reinforcing that fact that making it thread_local and registering only in the main thread
@@ -17,9 +18,10 @@ thread_local! {
     pub static HOTKEY_MANAGER: RefCell<Option<GlobalHotKeyManager>> = RefCell::new(None);
 }
 
+// Persist Hotkeys
 #[derive(Serialize, Deserialize, Debug)]
 struct HotkeyCache {
-    string_hotkeys: HashMap<String, String>
+    string_hotkeys: HashMap<String, String>,
 }
 
 impl HotkeyCache {
@@ -55,12 +57,10 @@ pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, HotK
                     hotkey_map.insert(name, hotkey);
                 }
                 Err(e) => {
-                    println!("Failed to parse hotkey '{}': {}", hotkey_str, e);
-                    // Handle the error as needed (e.g., log it, skip it, etc.)
+                    log::error!("LOAD_HOTKEY_FROM_CACHE: Failed to parse hotkey '{}': {}", hotkey_str, e);
                 }
             }
         }
-    
         hotkey_map
     } else {
         HashMap::new() // Return an empty map if loading fails
@@ -69,12 +69,14 @@ pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, HotK
 
 #[tauri::command]
 pub async fn return_loaded_hotkeys(
-    app_handle: tauri::AppHandle,
-    state: State<'_, AppState>,
 ) -> Result<HashMap<String, String>, String> {
-    match HotkeyCache::load_from_file(PathBuf::from(HOTKEY_CACHE)) {
+    match HotkeyCache::load_from_file(APP_CACHE_DIR.get().expect("hotkey: APP_CACHE_DIR not initialized").join(HOTKEY_CACHE)) {
         Ok(cache) => Ok(cache.string_hotkeys),
-        Err(e) => Err(format!("Failed to load hotkeys: {}", e)),
+        _ => {
+            log::error!("Return_Loaded_Hotkeys: Cannot find APP_CACHE_DIR hotkeys");
+            Err(format!("Failed to load hotkeys"))
+        }
+        //Err(e) => Err(format!("Failed to load hotkeys: {}", e)),
     }
 }
 
@@ -84,26 +86,22 @@ pub async fn set_hotkeys(
     state: State<'_, AppState>,
     play_pause_hotkey: String,
     next_track_hotkey: String,
-    prev_track_hotkey: String,
-    save_hotkey: bool
+    prev_track_hotkey: String
 ) -> Result<AuthResult, String> {
 
-    // Store these hotkeys in a new hashmap
     // TODO - need to check if they are empty and skip otherwise
-    if save_hotkey {
-        let mut save_hotkeys = HashMap::new();
-        save_hotkeys.insert("play_pause".to_string(), play_pause_hotkey.clone());
-        save_hotkeys.insert("next_track".to_string(), next_track_hotkey.clone());
-        save_hotkeys.insert("prev_track".to_string(), prev_track_hotkey.clone());
-
-        let _ = save_hotkeys_to_cache(save_hotkeys, PathBuf::from(HOTKEY_CACHE));
-    }
-
-    let new_hotkeys: HashMap<String, HotKey> = get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey)?;
-    println!("New hotkeys received: {:?}", new_hotkeys);
     
+    let mut save_hotkeys = HashMap::new();
+    save_hotkeys.insert("play_pause".to_string(), play_pause_hotkey.clone());
+    save_hotkeys.insert("next_track".to_string(), next_track_hotkey.clone());
+    save_hotkeys.insert("prev_track".to_string(), prev_track_hotkey.clone());
+
+    let _ = save_hotkeys_to_cache(save_hotkeys, APP_CACHE_DIR.get().expect("hotkey: APP_CACHE_DIR not initialized").join(HOTKEY_CACHE));
+    
+    let new_hotkeys: HashMap<String, HotKey> =
+        get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey)?;
     let cloned_new_hotkeys = new_hotkeys.clone();
-    
+
     // Lock the hotkey_hashmap and extract data before entering the main thread logic
     let mut hotkey_map_guard = state.hotkey_hashmap.lock().await;
 
@@ -118,22 +116,22 @@ pub async fn set_hotkeys(
                     // Unregister old hotkeys
                     for (name, hotkey) in old_hotkeys {
                         if let Err(e) = hotkey_manager.unregister(hotkey) {
-                            println!("Failed to unregister hotkey '{}': {}", name, e);
+                            log::error!("Set_Hotkeys: Failed to unregister hotkey '{}': {}", name, e);
                         } else {
-                            println!("Unregistered hotkey '{}'", name);
+                            log::debug!("Set_Hotkeys: Unregistered hotkey '{}'", name);
                         }
                     }
 
                     // Register new hotkeys
                     for (name, hotkey) in cloned_new_hotkeys {
                         if let Err(e) = hotkey_manager.register(hotkey) {
-                            println!("Failed to register hotkey '{}': {}", name, e);
+                            log::error!("Set_Hotkeys: Failed to register hotkey '{}': {}", name, e);
                         } else {
-                            println!("Registered hotkey '{}', {:?}", name, hotkey);
+                            log::debug!("Set_Hotkeys: Registered hotkey '{}', {:?}", name, hotkey);
                         }
                     }
                 } else {
-                    println!("HOTKEY_MANAGER is not initialized!");
+                    log::error!("Set_Hotkeys: HOTKEY_MANAGER is not initialized!");
                 }
             });
         });
@@ -141,10 +139,12 @@ pub async fn set_hotkeys(
         // Update the hashmap with the new hotkeys
         hotkey_map.extend(new_hotkeys);
     } else {
-        println!("Hotkey hashmap is not initialized!");
+        log::error!("Set_Hotkeys: Hotkey hashmap is not initialized!");
     }
 
-    Ok(AuthResult::Success { ok: "ok".to_string() })
+    Ok(AuthResult::Success {
+        ok: "ok".to_string(),
+    })
 }
 
 pub fn get_hotkeys(
@@ -175,7 +175,6 @@ pub fn get_hotkeys(
     Ok(hotkeys)
 }
 
-
 fn parse_hotkey(hotkey_str: &str) -> Result<HotKey, String> {
     let parts: Vec<&str> = hotkey_str.split(" + ").map(|s| s.trim()).collect();
     let mut modifiers = Modifiers::empty();
@@ -193,17 +192,13 @@ fn parse_hotkey(hotkey_str: &str) -> Result<HotKey, String> {
 
     let code = <Code as CodeExt>::from_str(&key.to_uppercase()).unwrap();
     let hotkey = HotKey::new(Some(modifiers), code);
-    println!("Hotkey created: {:?}", hotkey);
-
     //hotkey.id = rand::random::<u32>();
     Ok(hotkey)
 }
 
-
 pub fn init_hotkeys(app_handle: tauri::AppHandle) {
     let manager = GlobalHotKeyManager::new().expect("Failed to initialize new test manager");
     HOTKEY_MANAGER.with(|m| {
-        println!("Accessing HOTKEY_MANAGER in thread: {:?}", std::thread::current().id());
         *m.borrow_mut() = Some(manager)
     });
 
@@ -220,33 +215,31 @@ pub fn init_hotkeys(app_handle: tauri::AppHandle) {
                     // Register hotkeys
                     for (name, hotkey) in loaded_hotkeys {
                         if let Err(e) = hotkey_manager.register(hotkey) {
-                            println!("Failed to register hotkey '{}': {}", name, e);
+                            log::error!("Init_Hotkeys: Failed to register hotkey '{}': {}", name, e);
                         } else {
-                            println!("Registered hotkey '{}', {:?}", name, hotkey);
+                            log::debug!("Init_Hotkeys: Registered hotkey '{}', {:?}", name, hotkey);
                         }
                     }
                 } else {
-                    println!("HOTKEY_MANAGER is not initialized!");
+                    log::error!("Init_Hotkeys: HOTKEY_MANAGER is not initialized!");
                 }
             });
         });
 
-
         tauri::async_runtime::spawn(async move {
-        println!("adding loaded hotkeys to hotkey_map");
-        let app_state = loaded_hotkey_app_handle.state::<AppState>();
-        let mut hotkey_map_guard = app_state.hotkey_hashmap.lock().await;
-        if let Some(hotkey_map) = hotkey_map_guard.as_mut() {
-            hotkey_map.extend(cloned_loaded_hotkeys);
-        }
+            log::debug!("Init_Hotkeys: Adding previously persited hotkeys to Hotkey_map");
+            let app_state = loaded_hotkey_app_handle.state::<AppState>();
+            let mut hotkey_map_guard = app_state.hotkey_hashmap.lock().await;
+            if let Some(hotkey_map) = hotkey_map_guard.as_mut() {
+                hotkey_map.extend(cloned_loaded_hotkeys);
+            }
         });
-
     }
 
     let app_handle_for_hotkey = app_handle.clone();
     // Start new thread to listen to hotkey events
     tauri::async_runtime::spawn(async move {
-        println!("Starting hotkey event listener thread");
+        log::info!("Init_Hotkeys: Starting hotkey event listener thread");
 
         let global_hotkey_receiver = GlobalHotKeyEvent::receiver();
 
@@ -254,9 +247,6 @@ pub fn init_hotkeys(app_handle: tauri::AppHandle) {
             match global_hotkey_receiver.try_recv() {
                 Ok(event) => {
                     if event.state == HotKeyState::Released {
-                        println!("Hotkey released: {}", event.id);
-                        // Lock the state before calling handle_hotkey_event
-                        // Handle the hotkey event with the locked state
                         handle_hotkey_event(app_handle_for_hotkey.state(), event.id).await;
                     }
                 }
@@ -266,63 +256,54 @@ pub fn init_hotkeys(app_handle: tauri::AppHandle) {
                         tokio::time::sleep(Duration::from_millis(10)).await;
                     }
                     TryRecvError::Disconnected => {
-                        eprintln!("Hotkey receiver disconnected");
+                        log::error!("Init_Hotkeys: Hotkey receiver disconnected");
                         break;
                     }
                 },
             }
         }
 
-        println!("Hotkey event listener thread ended");
+        log::info!("Init_Hotkeys: Hotkey event listener thread ended");
     });
 }
 
-
 pub async fn handle_hotkey_event(state: State<'_, AppState>, hotkey_id: u32) {
-
     // Awaiting the lock to access HOTKEY_HASHMAP
     // let hotkey_map = HOTKEY_HASHMAP.lock().await;
 
     let hotkey_map_guard = state.hotkey_hashmap.lock().await;
     if let Some(hotkey_map) = hotkey_map_guard.as_ref() {
-        println!("all hotkeys in map: {:?}", hotkey_map);
-
         // Find the hotkey associated with the triggered event
-        if let Some((name, _)) = hotkey_map.iter().find(|(_, hotkey)| hotkey.id() == hotkey_id) {
-            println!("Hotkey '{}' triggered", name);
-    
+        if let Some((name, _)) = hotkey_map
+            .iter()
+            .find(|(_, hotkey)| hotkey.id() == hotkey_id)
+        {
             // Perform the action associated with this hotkey
             match name.as_str() {
                 "play_pause" => {
-                    println!("Toggling Play/Pause");
                     drop(hotkey_map_guard);
-    
-                    // Now you can access the state and call the play_pause function
                     if let Err(e) = play_pause(state).await {
-                        println!("Error in play/pause action: {}", e);
+                        log::error!("Error in play/pause action: {}", e);
                     }
                 }
                 "next_track" => {
-                    println!("Skipping to Next Track");
                     drop(hotkey_map_guard);
                     if let Err(e) = next_track(state).await {
-                        println!("Error in play/pause action: {}", e);
+                        log::error!("Error in play/pause action: {}", e);
                     }
-                    
                 }
                 "prev_track" => {
-                    println!("Rewinding to Previous Track");
                     drop(hotkey_map_guard);
                     if let Err(e) = prev_track(state).await {
-                        println!("Error in play/pause action: {}", e);
+                        log::error!("Error in play/pause action: {}", e);
                     }
                 }
                 _ => {
-                    println!("Unknown hotkey action for '{}'", name);
+                    log::error!("Unknown hotkey action for '{}'", name);
                 }
             }
         } else {
-            println!("Hotkey ID '{}' not found in HOTKEY_HASHMAP", hotkey_id);
+            log::error!("Hotkey ID '{}' not found in HOTKEY_HASHMAP", hotkey_id);
         }
     }
 }

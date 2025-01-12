@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "spotify-tauri",
-  "version": "0.1.0",
-  "identifier": "com.spotify-tauri.app",
+  "productName": "global-hotkey-spotify",
+  "version": "0.2.0",
+  "identifier": "com.global-hotkey-spotify.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "spotify-tauri",
+        "title": "global-hotkey-spotify",
         "width": 800,
         "height": 600
       }

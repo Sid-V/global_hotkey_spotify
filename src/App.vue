@@ -26,38 +26,36 @@ async function handleAuth() {
   // First check if we already have valid auth
   try {
     const authStatus = await invoke<AuthResult>("check_auth_status");
-    console.log("Initial auth status check:", authStatus);
+    console.log("HandleAuth: Initial auth status check: ", authStatus);
     
     if (authStatus.Success) {
       isLoggedIn.value = true;
       return; // Exit early since we're already authenticated
     }
   } catch (error) {
-    console.error("Error checking auth status:", error);
+    //error("Error checking auth status: {error}");
     // Continue with auth flow if check fails
   }
   try {
     const result = await invoke<AuthResult>("init_auth");
 
-    console.log("result", result);
+    console.log("HandleAuth: Result", result);
 
     if (result.NeedsAuth) {
-      console.log("Opening auth window with URL:", result.NeedsAuth.url);
+      console.log("HandleAuth: Opening auth window with URL:", result.NeedsAuth.url);
       window.open(result.NeedsAuth.url, "_blank");
       
       // Listen for the code from the callback window
-      window.addEventListener('message', async function handleCallback(event) {
-        console.log("Received message:", event.data);
-        
+      window.addEventListener('message', async function handleCallback(event) {        
         if (event.data.type === 'spotify-callback' && event.data.code) {
-          console.log("Received callback code:", event.data.code);
+          console.log("HandleAuth: Received callback code:", event.data.code);
           
           try {
             const authResult = await invoke<AuthResult>("handle_callback", {
               code: event.data.code
             });
             
-            console.log("Auth result:", authResult);
+            console.log("HandleAuth: Final result:", authResult);
             
             if (authResult.Success) {
               isLoggedIn.value = true;
@@ -65,8 +63,8 @@ async function handleAuth() {
               errorMessage.value = authResult.Error.message;
             }
           } catch (error) {
-            console.error("Error handling callback:", error);
-            errorMessage.value = "Failed to complete authentication";
+            console.error("HandleAuth: Error handling callback:", error);
+            errorMessage.value = "Failed to complete authentication. Unknown Error.";
           }
         }
       });
@@ -77,9 +75,8 @@ async function handleAuth() {
       errorMessage.value = result.Error.message;
     }
   } catch (error) {
-    console.error("Authentication failed:", error);
-    console.error("Error occurred on line:", new Error().stack?.split('\n')[1]?.trim());
-    errorMessage.value = "Failed to connect to Spotify";
+    console.error("HandleAuth: Authentication failed:", error);    
+    errorMessage.value = "Failed to connect to Spotify OAuth";
   }
 }
 
@@ -91,6 +88,7 @@ async function handlePlayPause() {
     
     if (result.Success) {
       isPlaying.value = !isPlaying.value;
+      errorMessage.value = "";
     } else if (result.Error) {
       errorMessage.value = result.Error.message;
     }
@@ -133,16 +131,17 @@ async function handleNextTrack() {
 async function checkAuthStatus() {
   try {
     const result = await invoke<AuthResult>("check_auth_status");
-    console.log("Auth status check result:", result);
+    console.log("CheckAuthStatus: Result", result);
+    
     
     if (result.Success) {
       isLoggedIn.value = true;
     } else if (result.Error) {
-      console.log("Auth check error:", result.Error);
+      console.log("CheckAuthStatus: Error", result.Error);
       isLoggedIn.value = false;
     }
   } catch (error) {
-    console.error("Failed to check auth status:", error);
+    console.error("CheckAuthStatus: Failed to check auth status", error);
     isLoggedIn.value = false;
   }
 }
@@ -154,8 +153,8 @@ async function loadPersistedHotkeys() {
     nextTrackHotkey.value = hotkeys["next_track"] || '';
     prevTrackHotkey.value = hotkeys["prev_track"] || '';
   } catch (error) {
-    console.error("Failed to load hotkeys:", error);
-    errorMessage.value = "Failed to load hotkeys";
+    console.error("LoadPersistedHotkeys: Failed to load hotkeys:", error);
+    errorMessage.value = "Failed to load previous hotkeys or no previous hotkeys found";
   }
 }
 
@@ -206,8 +205,7 @@ async function saveHotkeys() {
       {
         playPauseHotkey: playPauseHotkey.value,
         nextTrackHotkey: nextTrackHotkey.value,
-        prevTrackHotkey: prevTrackHotkey.value,
-        saveHotkey: true
+        prevTrackHotkey: prevTrackHotkey.value
       }
     );
     
@@ -225,17 +223,17 @@ onMounted(async () => {
   await checkAuthStatus();
   await loadPersistedHotkeys();
   
-  // Check auth status every 5 mins
+  // Check auth status every 10 mins
   setInterval(async () => {
     await checkAuthStatus();
-  }, 300000);
+  }, 600000);
 });
 
 </script>
 
 <template>
   <div class="container">
-    <h1>Spotify Tauri App</h1>
+    <h1>Global Hotkeys Spotify Controls</h1>
 
     <!-- Login Section -->
     <div v-if="!isLoggedIn" class="login-section">
@@ -249,7 +247,6 @@ onMounted(async () => {
 
     <!-- Logged-In Section with Playback Controls -->
     <div v-else class="logged-in">
-      <h2>Spotify Player</h2>
       
       <!-- Existing playback controls -->
       <div class="playback-controls">

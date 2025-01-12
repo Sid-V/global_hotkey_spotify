@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 
 src-tauri/.spotify_token.json
+*spotify_token.json

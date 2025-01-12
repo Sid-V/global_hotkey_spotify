@@ -1,0 +1,4 @@
+TODO LIST
+1. variable sizing for the window. i.e, be able to resize it and also be more dynamic 
+2. Check if the user is changing all the hotkeys or just a few of them and accordingly call the function
+5. check if autostart works
