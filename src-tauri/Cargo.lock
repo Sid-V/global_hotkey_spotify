@@ -1371,6 +1371,7 @@ dependencies = [
  "tauri-plugin-autostart",
  "tauri-plugin-log",
  "tokio",
+ "winapi",
 ]
 
 [[package]]

@@ -4,7 +4,13 @@ use std::{
     env::temp_dir, io::{BufRead, BufReader, Write}, net::TcpListener, sync::Once, thread
 };
 use tauri::State;
+use winapi::um::winsock2::WSAStartup;
+use winapi::shared::minwindef::WORD;
 
+// Define MAKEWORD macro
+fn makeword(low: u8, high: u8) -> WORD {
+    ((high as WORD) << 8) | (low as WORD)
+}
 use crate::AppState;
 static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
 
@@ -58,6 +64,12 @@ pub fn init_spotify() -> AuthCodeSpotify {
 
 fn start_callback_server() {
     CALLBACK_SERVER.call_once(|| {
+        // Initialize WSA
+        let _wsa_data = unsafe {
+            let mut data = std::mem::zeroed();
+            WSAStartup(makeword(2, 2), &mut data);
+            data
+        };
         thread::spawn(|| {
             let listener = TcpListener::bind("127.0.0.1:8888").unwrap();
             log::info!("Callback_server: listening on port 8888");

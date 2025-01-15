@@ -204,7 +204,7 @@ pub fn init_hotkeys(app_handle: tauri::AppHandle) {
 
     let loaded_hotkey_app_handle = app_handle.clone();
     // Load hotkeys from cache, if it exists
-    let loaded_hotkeys = load_hotkeys_from_cache(PathBuf::from(HOTKEY_CACHE));
+    let loaded_hotkeys = load_hotkeys_from_cache(APP_CACHE_DIR.get().expect("hotkey: APP_CACHE_DIR not initialized").join(HOTKEY_CACHE));
     let cloned_loaded_hotkeys = loaded_hotkeys.clone();
     if !loaded_hotkeys.is_empty() {
         // Lock the hotkey_hashmap and extract data before entering the main thread logic
