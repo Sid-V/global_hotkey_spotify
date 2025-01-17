@@ -85,7 +85,12 @@ The hotkeys you can use are
 - "F20"
 
 ## Testing
-I've only tested on my windows machine for all functionality. This app should be cross platform since it's built on Tauri but ymmv. Please add an issue if you have any bugs, I'm happy to fix them :) Or better, you can create a PR!
+I've only tested on my windows machine for all functionality. This app should be cross platform since it's built on Tauri but ymmv. Please add an issue here if you have any bugs, I'm happy to fix them :) Or better, you can create a PR!
   
 
 Please report any issues, this is still super early in development and I'm trying to learn Rust with this project
+
+## Todo list
+- Github CI/CD
+- Version control everytime I build and push branch instead of manual
+- automatically create releases
