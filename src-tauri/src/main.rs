@@ -3,9 +3,8 @@
     windows_subsystem = "windows"
 )]
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    LogicalPosition, LogicalSize, Manager, Position, Size, WindowEvent,
+    menu::{MenuBuilder, MenuItemBuilder,}, tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}, 
+    LogicalPosition, LogicalSize, Manager, Position, Size, WindowEvent
 };
 
 use tokio::sync::Mutex;
@@ -95,11 +94,11 @@ fn main() {
                     window_hider.hide().unwrap();
                 }
                 _ => {}
-            });
+            });            
 
             // Tray icon events
             let _ = TrayIconBuilder::new()
-                .tooltip("Spotify Hotkey")
+                .tooltip("Global Hotkey Spotify")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menuitems)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
@@ -129,8 +128,8 @@ fn main() {
                         let primary_monitor = window.primary_monitor().unwrap().unwrap();
                         let screen_size = primary_monitor.size();
                         let logical_size = LogicalSize::<f64> {
-                            width: screen_size.width as f64 * 0.3, // 40% of screen width
-                            height: screen_size.height as f64 * 0.5, // 40% of screen height
+                            width: screen_size.width as f64 * 0.3, // 30% of screen width
+                            height: screen_size.height as f64 * 0.5, // 50% of screen height
                         };
                         let logical_s = Size::Logical(logical_size);
                         let _ = window.set_size(logical_s);
