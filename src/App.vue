@@ -8,6 +8,8 @@ const isPlaying = ref(false);
 const playPauseHotkey = ref('');
 const nextTrackHotkey = ref('');
 const prevTrackHotkey = ref('');
+const volumeUpHotkey = ref('');
+const volumeDownHotkey = ref('');
 const isRecordingHotkey = ref('');
 
 interface AuthResult {
@@ -20,6 +22,8 @@ interface Hotkeys {
   play_pause: string;
   next_track: string;
   prev_track: string;
+  volume_up: string;
+  volume_down: string;
 }
 
 async function handleAuth() {
@@ -182,6 +186,8 @@ async function loadPersistedHotkeys() {
     playPauseHotkey.value = hotkeys["play_pause"] || '';
     nextTrackHotkey.value = hotkeys["next_track"] || '';
     prevTrackHotkey.value = hotkeys["prev_track"] || '';
+    volumeUpHotkey.value = hotkeys["volume_up"] || '';
+    volumeDownHotkey.value = hotkeys["volume_down"] || '';
   } catch (error) {
     console.error("LoadPersistedHotkeys: Failed to load hotkeys:", error);
     errorMessage.value = "Failed to load previous hotkeys or no previous hotkeys found";
@@ -217,6 +223,12 @@ function handleKeyDown(e: KeyboardEvent, control: string) {
     case 'prevTrack':
       prevTrackHotkey.value = hotkeyString;
       break;
+    case 'volumeUp':
+      volumeUpHotkey.value = hotkeyString;
+      break;
+    case 'volumeDown':
+      volumeDownHotkey.value = hotkeyString;
+      break;
   }
 }
 
@@ -235,7 +247,9 @@ async function saveHotkeys() {
       {
         playPauseHotkey: playPauseHotkey.value,
         nextTrackHotkey: nextTrackHotkey.value,
-        prevTrackHotkey: prevTrackHotkey.value
+        prevTrackHotkey: prevTrackHotkey.value,
+        volumeUpHotkey: volumeUpHotkey.value,
+        volumeDownHotkey: volumeDownHotkey.value
       }
     );
     
@@ -345,8 +359,36 @@ onMounted(async () => {
               placeholder="Click to set hotkey"
             />
           </div>
-          
 
+          <div class="hotkey-input-group">
+            <label for="volumeUpHotkey">Volume Up:</label>
+            <input
+              id="volumeUpHotkey"
+              type="text"
+              :value="volumeUpHotkey"
+              readonly
+              :class="{ 'recording': isRecordingHotkey === 'volumeUp' }"
+              @focus="startRecording('volumeUp')"
+              @blur="stopRecording"
+              @keydown="handleKeyDown($event, 'volumeUp')"
+              placeholder="Click to set hotkey"
+            />
+          </div>
+
+          <div class="hotkey-input-group">
+            <label for="volumeDownHotkey">Volume Down:</label>
+            <input
+              id="volumeDownHotkey"
+              type="text"
+              :value="volumeDownHotkey"
+              readonly
+              :class="{ 'recording': isRecordingHotkey === 'volumeDown' }"
+              @focus="startRecording('volumeDown')"
+              @blur="stopRecording"
+              @keydown="handleKeyDown($event, 'volumeDown')"
+              placeholder="Click to set hotkey"
+            />
+          </div>
           
           <button type="submit" class="save-hotkeys-button">Save Hotkeys</button>
         </form>

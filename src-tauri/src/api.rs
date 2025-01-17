@@ -7,7 +7,7 @@ use tauri::State;
 use winapi::um::winsock2::WSAStartup;
 use winapi::shared::minwindef::WORD;
 
-// Define MAKEWORD macro
+// Define MAKEWORD macro - something I need for it to work on windows
 fn makeword(low: u8, high: u8) -> WORD {
     ((high as WORD) << 8) | (low as WORD)
 }

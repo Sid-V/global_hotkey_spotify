@@ -129,8 +129,8 @@ fn main() {
                         let primary_monitor = window.primary_monitor().unwrap().unwrap();
                         let screen_size = primary_monitor.size();
                         let logical_size = LogicalSize::<f64> {
-                            width: screen_size.width as f64 * 0.4, // 40% of screen width
-                            height: screen_size.height as f64 * 0.4, // 40% of screen height
+                            width: screen_size.width as f64 * 0.3, // 40% of screen width
+                            height: screen_size.height as f64 * 0.5, // 40% of screen height
                         };
                         let logical_s = Size::Logical(logical_size);
                         let _ = window.set_size(logical_s);
@@ -141,29 +141,6 @@ fn main() {
                         let logical_pos: Position = Position::Logical(logical_position);
                         let _ = window.set_position(logical_pos);
                         let _ = window.set_focus();
-
-                        // // Get the primary monitor's size
-                        // let primary_monitor = window.primary_monitor().unwrap().unwrap();
-                        // let screen_size = primary_monitor.size();
-
-                        // // Calculate the window's size and position based on the screen size
-                        // let window_width = screen_size.width as f64 * 0.5; // 50% of screen width
-                        // let window_height = screen_size.height as f64 * 0.5; // 50% of screen height
-
-                        // let logical_size = LogicalSize::<f64> {
-                        //     width: window_width,
-                        //     height: window_height,
-                        // };
-                        // let logical_s = Size::Logical(logical_size);
-                        // let _ = window.set_size(logical_s);
-
-                        // let logical_position = LogicalPosition::<f64> {
-                        //     x: (screen_size.width as f64 - window_width) / 2.0,
-                        //     y: (screen_size.height as f64 - window_height) / 2.0,
-                        // };
-                        // let logical_pos: Position = Position::Logical(logical_position);
-                        // let _ = window.set_position(logical_pos);
-                        // let _ = window.set_focus();
                     }
                     TrayIconEvent::Click {
                         button: MouseButton::Right,

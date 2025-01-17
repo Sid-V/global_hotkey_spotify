@@ -10,7 +10,7 @@ use tauri::{Manager, State};
 
 use crate::{AppState, APP_CACHE_DIR};
 use crate::HOTKEY_CACHE;
-use crate::{api::AuthResult, next_track, play_pause, prev_track};
+use crate::{api::AuthResult, next_track, play_pause, prev_track, volume_control_up, volume_control_down};
 
 // Hotkey manager needs to be declared in the same thread as the registration of hotkeys
 // So reinforcing that fact that making it thread_local and registering only in the main thread
@@ -86,7 +86,9 @@ pub async fn set_hotkeys(
     state: State<'_, AppState>,
     play_pause_hotkey: String,
     next_track_hotkey: String,
-    prev_track_hotkey: String
+    prev_track_hotkey: String,
+    volume_up_hotkey: String,
+    volume_down_hotkey: String,
 ) -> Result<AuthResult, String> {
 
     // TODO - need to check if they are empty and skip otherwise
@@ -95,11 +97,13 @@ pub async fn set_hotkeys(
     save_hotkeys.insert("play_pause".to_string(), play_pause_hotkey.clone());
     save_hotkeys.insert("next_track".to_string(), next_track_hotkey.clone());
     save_hotkeys.insert("prev_track".to_string(), prev_track_hotkey.clone());
+    save_hotkeys.insert("volume_up".to_string(), volume_up_hotkey.clone());
+    save_hotkeys.insert("volume_down".to_string(), volume_down_hotkey.clone());
 
     let _ = save_hotkeys_to_cache(save_hotkeys, APP_CACHE_DIR.get().expect("hotkey: APP_CACHE_DIR not initialized").join(HOTKEY_CACHE));
     
     let new_hotkeys: HashMap<String, HotKey> =
-        get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey)?;
+        get_hotkeys(play_pause_hotkey, next_track_hotkey, prev_track_hotkey, volume_up_hotkey, volume_down_hotkey)?;
     let cloned_new_hotkeys = new_hotkeys.clone();
 
     // Lock the hotkey_hashmap and extract data before entering the main thread logic
@@ -151,6 +155,8 @@ pub fn get_hotkeys(
     play_pause_hotkey: String,
     next_track_hotkey: String,
     prev_track_hotkey: String,
+    volume_up_hotkey: String,
+    volume_down_hotkey: String,
 ) -> Result<HashMap<String, HotKey>, String> {
     let mut hotkeys = HashMap::new();
 
@@ -169,6 +175,18 @@ pub fn get_hotkeys(
     if !prev_track_hotkey.is_empty() {
         if let Ok(hotkey) = parse_hotkey(&prev_track_hotkey) {
             hotkeys.insert("prev_track".to_string(), hotkey);
+        }
+    }
+
+    if !volume_up_hotkey.is_empty() {
+        if let Ok(hotkey) = parse_hotkey(&volume_up_hotkey) {
+            hotkeys.insert("volume_up".to_string(), hotkey);
+        }
+    }
+
+    if !volume_down_hotkey.is_empty() {
+        if let Ok(hotkey) = parse_hotkey(&volume_down_hotkey) {
+            hotkeys.insert("volume_down".to_string(), hotkey);
         }
     }
 
@@ -298,6 +316,18 @@ pub async fn handle_hotkey_event(state: State<'_, AppState>, hotkey_id: u32) {
                         log::error!("Error in play/pause action: {}", e);
                     }
                 }
+                "volume_up" => {
+                    drop(hotkey_map_guard);
+                    if let Err(e) = volume_control_up(state).await {
+                        log::error!("Error in volume up action: {}", e);
+                    }
+                }
+                "volume_down" => {
+                    drop(hotkey_map_guard);
+                    if let Err(e) = volume_control_down(state).await {
+                        log::error!("Error in volume down action: {}", e);
+                    }
+                }
                 _ => {
                     log::error!("Unknown hotkey action for '{}'", name);
                 }
@@ -359,7 +389,54 @@ impl CodeExt for Code {
             // Special keys
             "SPACE" => Ok(Code::Space),
             "ENTER" => Ok(Code::Enter),
-            _ => Err(format!("Unsupported key: {}", s)),
+            "-" => Ok(Code::Minus),
+            "=" => Ok(Code::Equal),
+            "/" => Ok(Code::Slash),
+            "\\" => Ok(Code::Backslash),
+            ";" => Ok(Code::Semicolon),
+            "'" => Ok(Code::Quote),
+            "," => Ok(Code::Comma),
+            "." => Ok(Code::Period),
+            "[" => Ok(Code::BracketLeft),
+            "]" => Ok(Code::BracketRight),
+            "`" => Ok(Code::Backquote),
+            "Home" => Ok(Code::Home),
+            "End" => Ok(Code::End),
+            "PageUp" => Ok(Code::PageUp),
+            "PageDown" => Ok(Code::PageDown),
+            "Delete" => Ok(Code::Delete),
+            "Backspace" => Ok(Code::Backspace),
+            "Escape" => Ok(Code::Escape),
+            "Tab" => Ok(Code::Tab),
+            "PrintScreen" => Ok(Code::PrintScreen),
+            "ScrollLock" => Ok(Code::ScrollLock),
+            "Pause" => Ok(Code::Pause),
+            "Insert" => Ok(Code::Insert),
+            "NumLock" => Ok(Code::NumLock),
+            "F1" => Ok(Code::F1),
+            "F2" => Ok(Code::F2),
+            "F3" => Ok(Code::F3),
+            "F4" => Ok(Code::F4),
+            "F5" => Ok(Code::F5),
+            "F6" => Ok(Code::F6),
+            "F7" => Ok(Code::F7),
+            "F8" => Ok(Code::F8),
+            "F9" => Ok(Code::F9),
+            "F10" => Ok(Code::F10),
+            "F11" => Ok(Code::F11),
+            "F12" => Ok(Code::F12),
+            "F13" => Ok(Code::F13),
+            "F14" => Ok(Code::F14),
+            "F15" => Ok(Code::F15),
+            "F16" => Ok(Code::F16),
+            "F17" => Ok(Code::F17),
+            "F18" => Ok(Code::F18),
+            "F19" => Ok(Code::F19),
+            "F20" => Ok(Code::F20),
+            _ => {
+                log::error!("Unsupported key '{}' was pressed. Please create a new issue in Github.", s);
+                Err(format!("The key '{}' is not supported as a hotkey. Please create a new issue in Github.", s))
+            }
         }
     }
 }
