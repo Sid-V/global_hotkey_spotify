@@ -117,6 +117,8 @@ fn start_callback_server() {
 pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String> {
     start_callback_server();
 
+    log::debug!("Init_Auth: Called");
+
     let spotify_lock = state.spotify.lock().await;
     let spotify = spotify_lock.as_ref().unwrap();
     // Check for existing token
@@ -181,6 +183,22 @@ pub async fn handle_callback(
                     Err(e) => log::error!("Handle_callback: Failed to cache token: {}", e),
                 }
             }
+
+            // Try to get the current playback state
+            match spotify.current_playback(None, None::<Vec<_>>).await {
+                Ok(Some(playback)) => {
+                    let mut volume_lock = state.volume.lock().await;
+                    *volume_lock = playback.device.volume_percent.unwrap_or(50) as u8;
+                    log::debug!("Handle_callback: Current playback state volume: {:?}", *volume_lock);
+                }
+                Ok(None) => {
+                    log::debug!("Handle_callback: No active playback");
+                }
+                Err(e) => {
+                    log::error!("Handle_callback: Failed to get playback state: {}", e);
+                }
+            }
+
             Ok(AuthResult::Success {
                 ok: "ok".to_string(),
             })
@@ -230,6 +248,9 @@ pub async fn play_pause(state: State<'_, AppState>) -> Result<AuthResult, String
     if let Some(spotify) = &*spotify {
         match spotify.current_playback(None, None::<Vec<_>>).await {
             Ok(Some(playback)) => {
+                let mut volume_lock = state.volume.lock().await;
+                *volume_lock = playback.device.volume_percent.unwrap_or(50) as u8;
+                log::debug!("Play_Pause: Current playback volume percent: {:?}", *volume_lock);
                 let result = if playback.is_playing {
                     spotify.pause_playback(None).await
                 } else {
@@ -295,6 +316,52 @@ pub async fn prev_track(state: State<'_, AppState>) -> Result<AuthResult, String
     } else {
         Ok(AuthResult::Error {
             message: "Prev_Track: No active playback".to_string(),
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn volume_control_up(state: State<'_, AppState>) -> Result<AuthResult, String> {
+    log::debug!("Volume_Control_Up: Called");
+    let spotify = state.spotify.lock().await;
+    let mut volume_lock = state.volume.lock().await;
+    if let Some(spotify) = &*spotify {
+        log::info!("Volume_Control_Up: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock + 10).min(100));
+        *volume_lock = (*volume_lock + 10).min(100); // Increase volume by 10, max 100
+        match spotify.volume(*volume_lock, None).await {
+            Ok(_) => Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            }),
+            Err(e) => Ok(AuthResult::Error {
+                message: format!("Volume_Control_Up: API failed: {}", e),
+            }),
+        }
+    } else {
+        Ok(AuthResult::Error {
+            message: "Volume_Control_Up: No active playback".to_string(),
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn volume_control_down(state: State<'_, AppState>) -> Result<AuthResult, String> {
+    log::debug!("Volume_Control_Down: Called");
+    let spotify = state.spotify.lock().await;
+    let mut volume_lock = state.volume.lock().await;
+    if let Some(spotify) = &*spotify {
+        log::info!("Volume_Control_Down: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock as i8 - 10).max(0) as u8);  
+        *volume_lock = (*volume_lock as i8 - 10).max(0) as u8; // Decrease volume by 10, min 0
+        match spotify.volume(*volume_lock, None).await {
+            Ok(_) => Ok(AuthResult::Success {
+                ok: "ok".to_string(),
+            }),
+            Err(e) => Ok(AuthResult::Error {
+                message: format!("Volume_Control_Down: API failed: {}", e),
+            }),
+        }
+    } else {
+        Ok(AuthResult::Error {
+            message: "Volume_Control_Down: No active playback".to_string(),
         })
     }
 }

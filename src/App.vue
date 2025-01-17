@@ -128,6 +128,36 @@ async function handleNextTrack() {
   }
 }
 
+async function handleVolumeUp() {
+  try {
+    const result = await invoke<{ Success?: null; Error?: { message: string } }>(
+      "volume_control_up"
+    );
+    
+    if (result.Error) {
+      errorMessage.value = result.Error.message;
+    }
+  } catch (error) {
+    console.error("Volume up failed:", error);
+    errorMessage.value = "Failed to increase volume";
+  }
+}
+
+async function handleVolumeDown() {
+  try {
+    const result = await invoke<{ Success?: null; Error?: { message: string } }>(
+      "volume_control_down"
+    );
+    
+    if (result.Error) {
+      errorMessage.value = result.Error.message;
+    }
+  } catch (error) {
+    console.error("Volume down failed:", error);
+    errorMessage.value = "Failed to decrease volume";
+  }
+}
+
 async function checkAuthStatus() {
   try {
     const result = await invoke<AuthResult>("check_auth_status");
@@ -259,6 +289,12 @@ onMounted(async () => {
         <button @click="handleNextTrack" class="control-button">
           ⏭️ Next
         </button>
+        <button @click="handleVolumeUp" class="control-button">
+          🔊 Volume Up
+        </button>
+        <button @click="handleVolumeDown" class="control-button">
+          🔊 Volume Down
+        </button>
       </div>
       
       <!-- New Hotkey Configuration Form -->
@@ -310,6 +346,8 @@ onMounted(async () => {
             />
           </div>
           
+
+          
           <button type="submit" class="save-hotkeys-button">Save Hotkeys</button>
         </form>
       </div>
@@ -321,12 +359,23 @@ onMounted(async () => {
 
 <style scoped>
 .container {
-  padding: 2rem;
+  padding: 0;
+  margin: 0;
   text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #282828;
+  overflow: hidden;
 }
 
-.login-section {
-  margin-top: 2rem;
+.login-section,
+.logged-in {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .login-button {
@@ -380,6 +429,7 @@ onMounted(async () => {
   padding: 1rem;
   background-color: #282828;
   border-radius: 8px;
+  width: 100%;
 }
 
 .hotkey-form {

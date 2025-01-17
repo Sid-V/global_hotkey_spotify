@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 use global_hotkey::hotkey::HotKey;
 use rspotify::AuthCodeSpotify;
 use tauri_plugin_log::{Target, TargetKind};
+use log::LevelFilter;
 use std::{collections::HashMap, path::PathBuf, fs};
 use once_cell::sync::OnceCell;
 
@@ -29,6 +30,7 @@ pub static APP_CACHE_DIR: OnceCell<PathBuf> = OnceCell::new();
 pub struct AppState {
     pub spotify: tokio::sync::Mutex<Option<AuthCodeSpotify>>,
     pub hotkey_hashmap: tokio::sync::Mutex<Option<HashMap<String, HotKey>>>,
+    pub volume: tokio::sync::Mutex<u8>,
 }
 
 // Implement Default for AppState
@@ -37,6 +39,7 @@ impl Default for AppState {
         Self {
             spotify: Mutex::new(Some(init_spotify())),
             hotkey_hashmap: Mutex::new(Some(HashMap::new())),
+            volume: Mutex::new(50),
         }
     }
 }
@@ -46,7 +49,9 @@ fn main() {
         .plugin(tauri_plugin_log::Builder::new().targets([
             Target::new(TargetKind::Stdout),
             Target::new(TargetKind::LogDir { file_name: Some(LOGS_FILENAME.to_string())})
-        ])        
+        ])
+        .level_for("rspotify_http::reqwest", LevelFilter::Off) // Don't need these large logs to be written to file
+        .max_file_size(100000) // 100kb max file size
         .build())
         .setup(|app| {
             log::info!("Setting up Tauri...");
@@ -54,6 +59,7 @@ fn main() {
             log::info!("App cache dir: {:?}", app_cache_dir);
             fs::create_dir_all(&app_cache_dir).expect("Failed to create app cache directory");
             APP_CACHE_DIR.set(app_cache_dir.clone()).expect("Failed to set APP_CACHE_DIR");            
+            
             // Setup autostart on desktop
             #[cfg(desktop)]
             {
@@ -65,14 +71,9 @@ fn main() {
                     Some(vec!["--flag1", "--flag2"]),
                 ));
 
-                // Get the autostart manager
                 let autostart_manager = app.autolaunch();
-                // Enable autostart
                 let _ = autostart_manager.enable();
-                // Check enable state
                 log::info!("registered for autostart? {}", autostart_manager.is_enabled().unwrap());
-                // Disable autostart
-                let _ = autostart_manager.disable();
             }
             
             // Setup hotkeys manager
@@ -102,7 +103,10 @@ fn main() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menuitems)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        log::info!("Quitting application through tray exit...");
+                        app.exit(0)
+                    }
                     "show" => {
                         let window = app.get_webview_window("main").unwrap();
                         window.show().unwrap();
@@ -121,9 +125,12 @@ fn main() {
                         // LEFT CLICK BEHAVIOR
                         let window = tray_icon.app_handle().get_webview_window("main").unwrap();
                         let _ = window.show().unwrap();
+                        // Get primary monitor size and calculate window dimensions
+                        let primary_monitor = window.primary_monitor().unwrap().unwrap();
+                        let screen_size = primary_monitor.size();
                         let logical_size = LogicalSize::<f64> {
-                            width: 700.00, // TODO - figure out variable sizing?
-                            height: 700.00,
+                            width: screen_size.width as f64 * 0.4, // 40% of screen width
+                            height: screen_size.height as f64 * 0.4, // 40% of screen height
                         };
                         let logical_s = Size::Logical(logical_size);
                         let _ = window.set_size(logical_s);
@@ -134,6 +141,29 @@ fn main() {
                         let logical_pos: Position = Position::Logical(logical_position);
                         let _ = window.set_position(logical_pos);
                         let _ = window.set_focus();
+
+                        // // Get the primary monitor's size
+                        // let primary_monitor = window.primary_monitor().unwrap().unwrap();
+                        // let screen_size = primary_monitor.size();
+
+                        // // Calculate the window's size and position based on the screen size
+                        // let window_width = screen_size.width as f64 * 0.5; // 50% of screen width
+                        // let window_height = screen_size.height as f64 * 0.5; // 50% of screen height
+
+                        // let logical_size = LogicalSize::<f64> {
+                        //     width: window_width,
+                        //     height: window_height,
+                        // };
+                        // let logical_s = Size::Logical(logical_size);
+                        // let _ = window.set_size(logical_s);
+
+                        // let logical_position = LogicalPosition::<f64> {
+                        //     x: (screen_size.width as f64 - window_width) / 2.0,
+                        //     y: (screen_size.height as f64 - window_height) / 2.0,
+                        // };
+                        // let logical_pos: Position = Position::Logical(logical_position);
+                        // let _ = window.set_position(logical_pos);
+                        // let _ = window.set_focus();
                     }
                     TrayIconEvent::Click {
                         button: MouseButton::Right,
@@ -164,6 +194,8 @@ fn main() {
             play_pause,
             next_track,
             prev_track,
+            volume_control_up,
+            volume_control_down,
             set_hotkeys,
             return_loaded_hotkeys
         ])
