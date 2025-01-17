@@ -18,6 +18,9 @@ I wanted to learn a new language - Rust. I used to use this github project calle
 
 The main usecase is to be able to control your music quickly without changing the in-focus application. Especially useful when you are playing videogames and want to skip tracks or decrease the volume since a new round is starting.
 
+## "Why not use the media playback keys on your keyboard?"
+I have a 60% keyboard and do not have playback keys nor do I want to install VIA or an equivalent and map a bunch of layers to my keyboard. I wanted to learn Rust and build an app that I WANT.
+
 ## Installation
 Go to Releases and install the msi package. Now open 'global-hotkey-spotify'
 
@@ -32,7 +35,10 @@ NOTE: THERE MUST BE AN ACTIVE PLAYBACK FOR IT TO WORK. SO IF IT DOESN'T WORK, OP
 
 ## Hotkeys usable
 You can use either 0, 1 or a maximum of 2 modifiers. Modifiers are CTRL, ALT, CMD (on mac), SHIFT
-The hotkeys you can use are all digits, all letters and the following special characters
+The hotkeys you can use are 
+- ALL DIGITS
+- ALL LETTERS
+- The following special chars:-
 - "-"
 - "="
 - "/"
