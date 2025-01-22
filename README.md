@@ -1,5 +1,7 @@
 # Global Hotkeys Spotify
-This application will control your Spotify playback using Global Hotkeys. Cross-platform due to Tauri.
+This application will control your Spotify playback using Global Hotkeys. Cross-platform on Windows, MacOS and Linux due to Tauri.
+
+Requires Spotify Premium subscription.
 
 ![image](https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c)
 
@@ -22,16 +24,17 @@ The main usecase is to be able to control your music quickly without changing th
 I have a 60% keyboard and do not have playback keys nor do I want to install VIA or an equivalent and map a bunch of layers to my keyboard. I wanted to learn Rust and build an app that I WANT.
 
 ## Installation
-Go to Releases and install the msi package. Now open 'global-hotkey-spotify'
+Go to [Releases](https://github.com/Sid-V/global_hotkey_spotify/releases) and install the appropriate package for your operating system.
+
+Launch the application.
 
 ## Usage
 - Login using your spotify credentials. Please ignore the initial error message that says 'failed to load hotkeys'.
 - Test your spotify credentials are working using the buttons that play/pause, next track, prev track, volume up/down. 
-
-NOTE: THERE MUST BE AN ACTIVE PLAYBACK FOR IT TO WORK. SO IF IT DOESN'T WORK, OPEN SPOTIFY AND PLAY A SONG.
-
 - Now, add your global hotkey combinations and hit Save
 - Enjoy!
+
+NOTE: THERE MUST BE AN ACTIVE PLAYBACK FOR HOTKEYS TO WORK. SO IF IT DOESN'T WORK, OPEN SPOTIFY ON APP OR ON BROWSER AND PLAY A SONG.
 
 ## Hotkeys usable
 You can use either 0, 1 or a maximum of 2 modifiers. Modifiers are CTRL, ALT, CMD (on mac), SHIFT
@@ -91,6 +94,5 @@ I've only tested on my windows machine for all functionality. This app should be
 Please report any issues, this is still super early in development and I'm trying to learn Rust with this project
 
 ## Todo list
-- Github CI/CD
-- Version control everytime I build and push branch instead of manual
-- automatically create releases
+- Learn to docker
+- Add toast notification every time you prev/next track
