@@ -1,4 +1,4 @@
-name: 'build and publish'
+name: 'publish'
 
 on:
   push:
@@ -30,14 +30,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: 'pnpm'
-      
-      - name: install pnpm
-        run: npm install -g pnpm
 
-      - name: install frontend dependencies
-        run: pnpm install
-        
+
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -52,6 +46,8 @@ jobs:
         # webkitgtk 4.0 is for Tauri v1 - webkitgtk 4.1 is for Tauri v2.
         # You can remove the one that doesn't apply to your app to speed up the workflow a bit.
 
+      - name: install frontend dependencies
+        run: pnpm install
 
       - uses: tauri-apps/tauri-action@v0
         env:
