@@ -4,7 +4,7 @@
 )]
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder,}, tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}, 
-    LogicalPosition, LogicalSize, Manager, Position, Size
+    Manager, WebviewWindow, WindowEvent
 };
 
 use global_hotkey::hotkey::HotKey;
@@ -90,7 +90,31 @@ fn main() {
                 .build()
                 .unwrap();
 
-            let _window = app.get_webview_window("main").unwrap();
+            let main_window = app.get_webview_window("main").unwrap();
+            // Don't show taskbar icon
+            if let Err(err) = main_window.set_skip_taskbar(true) {
+                log::debug!("Failed to mark window as skip_taskbar: {err:?}");
+            }
+
+            // If closed, move to systray
+            let window_for_events = main_window.clone();
+            main_window.on_window_event(move |event| match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    if let Err(err) = window_for_events.hide() {
+                        log::debug!("Failed to hide window on close request: {err:?}");
+                    }
+                }
+                WindowEvent::Focused(false) | WindowEvent::Resized(_) => {
+                    if matches!(window_for_events.is_minimized(), Ok(true)) {
+                        if let Err(err) = window_for_events.hide() {
+                            log::debug!("Failed to hide window after minimize: {err:?}");
+                        }
+                    }
+                }
+                _ => {}
+            });
+                  
 
             // Tray icon events
             let _ = TrayIconBuilder::new()
@@ -104,7 +128,7 @@ fn main() {
                     }
                     "show" => {
                         let window = app.get_webview_window("main").unwrap();
-                        window.show().unwrap();
+                        reveal_window(&window);
                     }
                     _ => {
                         log::error!("Menu item event: menu item was not handled");
@@ -119,23 +143,7 @@ fn main() {
                     } => {
                         // LEFT CLICK BEHAVIOR
                         let window = tray_icon.app_handle().get_webview_window("main").unwrap();
-                        let _ = window.show().unwrap();
-                        // Get primary monitor size and calculate window dimensions
-                        let primary_monitor = window.primary_monitor().unwrap().unwrap();
-                        let screen_size = primary_monitor.size();
-                        let logical_size = LogicalSize::<f64> {
-                            width: screen_size.width as f64 * 0.3, // 30% of screen width
-                            height: screen_size.height as f64 * 0.5, // 50% of screen height
-                        };
-                        let logical_s = Size::Logical(logical_size);
-                        let _ = window.set_size(logical_s);
-                        let logical_position = LogicalPosition::<f64> {
-                            x: position.x - logical_size.width,
-                            y: position.y - logical_size.height - 30.,
-                        };
-                        let logical_pos: Position = Position::Logical(logical_position);
-                        let _ = window.set_position(logical_pos);
-                        let _ = window.set_focus();
+                        reveal_window(&window);
                     }
                     TrayIconEvent::Click {
                         button: MouseButton::Right,
@@ -173,4 +181,17 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// Helper to show window to screen
+fn reveal_window(window: &WebviewWindow) {
+    if let Err(err) = window.unminimize() {
+        log::debug!("Failed to unminimize window: {err:?}");
+    }
+    if let Err(err) = window.show() {
+        log::debug!("Failed to show window: {err:?}");
+    }
+    if let Err(err) = window.set_focus() {
+        log::debug!("Failed to focus window: {err:?}");
+    }
 }
