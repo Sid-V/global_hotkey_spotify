@@ -3,7 +3,8 @@ use serde::Serialize;
 use std::{
     env::temp_dir, io::{BufRead, BufReader, Write}, net::TcpListener, sync::Once, thread
 };
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
+use urlencoding::decode;
 
 #[cfg(target_os = "windows")]
 use winapi::um::winsock2::WSAStartup;
@@ -17,6 +18,11 @@ fn makeword(low: u8, high: u8) -> WORD {
 
 use crate::AppState;
 static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
+
+#[derive(Serialize, Clone)]
+struct SpotifyAuthPayload {
+    code: String,
+}
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
 const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
@@ -66,8 +72,8 @@ pub fn init_spotify() -> AuthCodeSpotify {
     AuthCodeSpotify::with_config(creds, oauth, config)
 }
 
-fn start_callback_server() {
-    CALLBACK_SERVER.call_once(|| {
+fn start_callback_server(app_handle: AppHandle) {
+    CALLBACK_SERVER.call_once(move || {
         #[cfg(target_os = "windows")]
         {
             // Initialize WSA
@@ -77,7 +83,9 @@ fn start_callback_server() {
                 data
             };
         }
-        thread::spawn(|| {
+        let thread_app_handle = app_handle.clone();
+        thread::spawn(move || {
+            let app_handle = thread_app_handle;
             let listener = TcpListener::bind("127.0.0.1:8888").unwrap();
             log::info!("Callback_server: listening on port 8888");
 
@@ -88,8 +96,22 @@ fn start_callback_server() {
                         let buf_reader = BufReader::new(&stream);
                         let request_line = buf_reader.lines().next();
 
-                        if let Some(Ok(_line)) = request_line {
+                        if let Some(Ok(line)) = request_line {
                             log::debug!("Callback_server: Received callback request");
+
+                            if let Some(code) = extract_code_from_request_line(&line) {
+                                log::debug!("Callback_server: Extracted auth code");
+                                if let Err(e) = app_handle.emit(
+                                    "spotify-auth-code",
+                                    SpotifyAuthPayload { code: code.clone() },
+                                ) {
+                                    log::error!("Callback_server: Failed to emit auth code: {}", e);
+                                } else {
+                                    log::debug!("Callback_server: Emitted auth code event to frontend");
+                                }
+                            } else {
+                                log::warn!("Callback_server: Unable to parse auth code from request line: {}", line);
+                            }
 
                             let response = format!("HTTP/1.1 200 OK\r\n\
                                 Content-Type: text/html\r\n\
@@ -120,9 +142,32 @@ fn start_callback_server() {
     });
 }
 
+fn extract_code_from_request_line(request_line: &str) -> Option<String> {
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next()?;
+    if method != "GET" {
+        return None;
+    }
+
+    let path_and_query = parts.next()?;
+    let (path, query) = path_and_query.split_once('?')?;
+    if !path.starts_with("/callback") {
+        return None;
+    }
+
+    for kv in query.split('&') {
+        let (key, value) = kv.split_once('=')?;
+        if key == "code" {
+            return decode(value).ok().map(|c| c.into_owned());
+        }
+    }
+
+    None
+}
+
 #[tauri::command]
-pub async fn init_auth(state: State<'_, AppState>) -> Result<AuthResult, String> {
-    start_callback_server();
+pub async fn init_auth(app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<AuthResult, String> {
+    start_callback_server(app_handle);
 
     log::debug!("Init_Auth: Called");
 

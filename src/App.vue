@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
-import { ref, onMounted } from "vue";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ref, onMounted, onUnmounted } from "vue";
 
 const isLoggedIn = ref(false);
 const errorMessage = ref("");
@@ -26,6 +28,55 @@ interface Hotkeys {
   volume_down: string;
 }
 
+interface SpotifyAuthEvent {
+  code: string;
+}
+
+let unlistenAuthEvent: UnlistenFn | null = null;
+let windowCallbackRegistered = false;
+let authStatusInterval: number | null = null;
+
+async function launchSpotifyAuthWindow(url: string) {
+  try {
+    await openUrl(url);
+    return;
+  } catch (pluginError) {
+    console.warn("LaunchSpotifyAuthWindow: openUrl failed, falling back to window.open", pluginError);
+  }
+
+  const popup = window.open(url, "_blank");
+  if (!popup) {
+    throw new Error("Browser blocked the Spotify login popup. Please allow popups or copy/paste the URL: " + url);
+  }
+}
+
+async function processAuthCode(code: string) {
+  console.log("ProcessAuthCode: Received code", code);
+  try {
+    const authResult = await invoke<AuthResult>("handle_callback", {
+      code,
+    });
+
+    console.log("ProcessAuthCode: Final result:", authResult);
+
+    if (authResult.Success) {
+      isLoggedIn.value = true;
+      errorMessage.value = "";
+    } else if (authResult.Error) {
+      errorMessage.value = authResult.Error.message;
+    }
+  } catch (error) {
+    console.error("ProcessAuthCode: Error handling callback:", error);
+    errorMessage.value = "Failed to complete authentication. Unknown Error.";
+  }
+}
+
+const windowCallbackHandler = async (event: MessageEvent) => {
+  if (event.data.type === "spotify-callback" && event.data.code) {
+    await processAuthCode(event.data.code);
+  }
+};
+
 async function handleAuth() {
   // First check if we already have valid auth
   try {
@@ -47,31 +98,12 @@ async function handleAuth() {
 
     if (result.NeedsAuth) {
       console.log("HandleAuth: Opening auth window with URL:", result.NeedsAuth.url);
-      window.open(result.NeedsAuth.url, "_blank");
-      
-      // Listen for the code from the callback window
-      window.addEventListener('message', async function handleCallback(event) {        
-        if (event.data.type === 'spotify-callback' && event.data.code) {
-          console.log("HandleAuth: Received callback code:", event.data.code);
-          
-          try {
-            const authResult = await invoke<AuthResult>("handle_callback", {
-              code: event.data.code
-            });
-            
-            console.log("HandleAuth: Final result:", authResult);
-            
-            if (authResult.Success) {
-              isLoggedIn.value = true;
-            } else if (authResult.Error) {
-              errorMessage.value = authResult.Error.message;
-            }
-          } catch (error) {
-            console.error("HandleAuth: Error handling callback:", error);
-            errorMessage.value = "Failed to complete authentication. Unknown Error.";
-          }
-        }
-      });
+      await launchSpotifyAuthWindow(result.NeedsAuth.url);
+
+      if (!windowCallbackRegistered) {
+        window.addEventListener("message", windowCallbackHandler);
+        windowCallbackRegistered = true;
+      }
     }
     else if (result.Success) {
       isLoggedIn.value = true;
@@ -79,8 +111,9 @@ async function handleAuth() {
       errorMessage.value = result.Error.message;
     }
   } catch (error) {
-    console.error("HandleAuth: Authentication failed:", error);    
-    errorMessage.value = "Failed to connect to Spotify OAuth";
+    console.error("HandleAuth: Authentication failed:", error);
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to connect to Spotify OAuth";
   }
 }
 
@@ -266,11 +299,32 @@ async function saveHotkeys() {
 onMounted(async () => {
   await checkAuthStatus();
   await loadPersistedHotkeys();
+
+  unlistenAuthEvent = await listen<SpotifyAuthEvent>("spotify-auth-code", async (event) => {
+    await processAuthCode(event.payload.code);
+  });
   
   // Check auth status every 10 mins
-  setInterval(async () => {
+  authStatusInterval = window.setInterval(async () => {
     await checkAuthStatus();
   }, 600000);
+});
+
+onUnmounted(() => {
+  if (unlistenAuthEvent) {
+    unlistenAuthEvent();
+    unlistenAuthEvent = null;
+  }
+
+  if (windowCallbackRegistered) {
+    window.removeEventListener("message", windowCallbackHandler);
+    windowCallbackRegistered = false;
+  }
+
+  if (authStatusInterval) {
+    clearInterval(authStatusInterval);
+    authStatusInterval = null;
+  }
 });
 
 </script>

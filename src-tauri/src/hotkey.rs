@@ -5,7 +5,7 @@ use global_hotkey::{
 use crossbeam_channel::TryRecvError;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use std::{cell::RefCell, collections::HashMap, fs, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, fs, path::{Path, PathBuf}};
 use tauri::{Manager, State};
 
 use crate::{AppState, APP_CACHE_DIR};
@@ -67,17 +67,39 @@ pub fn load_hotkeys_from_cache(cache_file_path: PathBuf) -> HashMap<String, HotK
     }
 }
 
+pub fn ensure_hotkey_cache_file_exists(cache_dir: &Path) -> Result<(), String> {
+    let cache_path = cache_dir.join(HOTKEY_CACHE);
+    if cache_path.exists() {
+        return Ok(());
+    }
+
+    let cache = HotkeyCache {
+        string_hotkeys: HashMap::new(),
+    };
+
+    cache.save_to_file(cache_path)
+}
+
 #[tauri::command]
 pub async fn return_loaded_hotkeys(
 ) -> Result<HashMap<String, String>, String> {
-    match HotkeyCache::load_from_file(APP_CACHE_DIR.get().expect("hotkey: APP_CACHE_DIR not initialized").join(HOTKEY_CACHE)) {
-        Ok(cache) => Ok(cache.string_hotkeys),
-        _ => {
-            log::error!("Return_Loaded_Hotkeys: Cannot find APP_CACHE_DIR hotkeys");
-            Err(format!("Failed to load hotkeys"))
-        }
-        //Err(e) => Err(format!("Failed to load hotkeys: {}", e)),
+    let cache_path = APP_CACHE_DIR
+        .get()
+        .expect("hotkey: APP_CACHE_DIR not initialized")
+        .join(HOTKEY_CACHE);
+
+    if !cache_path.exists() {
+        log::warn!(
+            "Return_Loaded_Hotkeys: Hotkey cache missing at {:?}, returning defaults",
+            cache_path
+        );
+        return Ok(HashMap::new());
     }
+
+    HotkeyCache::load_from_file(cache_path).map(|cache| cache.string_hotkeys).map_err(|e| {
+        log::error!("Return_Loaded_Hotkeys: Failed to load cache: {}", e);
+        format!("Failed to load hotkeys: {}", e)
+    })
 }
 
 #[tauri::command]

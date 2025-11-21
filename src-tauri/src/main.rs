@@ -4,10 +4,9 @@
 )]
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder,}, tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}, 
-    LogicalPosition, LogicalSize, Manager, Position, Size, WindowEvent
+    LogicalPosition, LogicalSize, Manager, Position, Size
 };
 
-use tokio::sync::Mutex;
 use global_hotkey::hotkey::HotKey;
 use rspotify::AuthCodeSpotify;
 use tauri_plugin_log::{Target, TargetKind};
@@ -36,9 +35,9 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            spotify: Mutex::new(Some(init_spotify())),
-            hotkey_hashmap: Mutex::new(Some(HashMap::new())),
-            volume: Mutex::new(50),
+            spotify: tokio::sync::Mutex::new(Some(init_spotify())),
+            hotkey_hashmap: tokio::sync::Mutex::new(Some(HashMap::new())),
+            volume: tokio::sync::Mutex::new(50),
         }
     }
 }
@@ -52,12 +51,16 @@ fn main() {
         .level_for("rspotify_http::reqwest", LevelFilter::Off) // Don't need these large logs to be written to file
         .max_file_size(100000) // 100kb max file size
         .build())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             log::info!("Setting up Tauri...");
             let app_cache_dir = app.path().app_cache_dir().unwrap();
             log::info!("App cache dir: {:?}", app_cache_dir);
             fs::create_dir_all(&app_cache_dir).expect("Failed to create app cache directory");
             APP_CACHE_DIR.set(app_cache_dir.clone()).expect("Failed to set APP_CACHE_DIR");            
+            if let Err(e) = ensure_hotkey_cache_file_exists(&app_cache_dir) {
+                log::warn!("Failed to initialize hotkey cache file: {}", e);
+            }
             
             // Setup autostart on desktop
             #[cfg(desktop)]
@@ -87,14 +90,7 @@ fn main() {
                 .build()
                 .unwrap();
 
-            let window = app.get_webview_window("main").unwrap();
-            let window_hider = window.clone();
-            window.on_window_event(move |event| match event {
-                WindowEvent::Focused(false) => {
-                    window_hider.hide().unwrap();
-                }
-                _ => {}
-            });            
+            let _window = app.get_webview_window("main").unwrap();
 
             // Tray icon events
             let _ = TrayIconBuilder::new()
