@@ -1620,7 +1620,7 @@ dependencies = [
 
 [[package]]
 name = "global-hotkey-spotify"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "crossbeam-channel",
  "global-hotkey",

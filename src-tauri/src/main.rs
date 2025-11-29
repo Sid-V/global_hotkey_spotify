@@ -138,7 +138,6 @@ fn main() {
                     TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
-                        position,
                         ..
                     } => {
                         // LEFT CLICK BEHAVIOR

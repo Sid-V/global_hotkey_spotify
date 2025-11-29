@@ -1,9 +1,9 @@
 [package]
 name = "global-hotkey-spotify"
-version = "0.1.0"
+version = "0.6.0"
 description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
+authors = ["sidv"]
+edition = "2024"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
