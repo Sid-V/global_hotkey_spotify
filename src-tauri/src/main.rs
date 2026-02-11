@@ -8,11 +8,10 @@ use tauri::{
 };
 
 use global_hotkey::hotkey::HotKey;
-use rspotify::AuthCodeSpotify;
+use rspotify::AuthCodePkceSpotify;
 use tauri_plugin_log::{Target, TargetKind};
 use log::LevelFilter;
-use std::{collections::HashMap, path::PathBuf, fs};
-use once_cell::sync::OnceCell;
+use std::{collections::HashMap, path::PathBuf, fs, sync::OnceLock};
 
 use crate::api::*;
 use crate::hotkey::*;
@@ -22,11 +21,11 @@ pub mod hotkey;
 
 pub const HOTKEY_CACHE: &str = ".hotkey_cache.json";
 pub const LOGS_FILENAME: &str = "global-hotkey-spotify-logs";
-pub static APP_CACHE_DIR: OnceCell<PathBuf> = OnceCell::new();
+pub static APP_CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 // Main state of the app
 pub struct AppState {
-    pub spotify: tokio::sync::Mutex<Option<AuthCodeSpotify>>,
+    pub spotify: tokio::sync::Mutex<Option<AuthCodePkceSpotify>>,
     pub hotkey_hashmap: tokio::sync::Mutex<Option<HashMap<String, HotKey>>>,
     pub volume: tokio::sync::Mutex<u8>,
 }
@@ -35,7 +34,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            spotify: tokio::sync::Mutex::new(Some(init_spotify())),
+            spotify: tokio::sync::Mutex::new(None),
             hotkey_hashmap: tokio::sync::Mutex::new(Some(HashMap::new())),
             volume: tokio::sync::Mutex::new(50),
         }
@@ -57,7 +56,16 @@ fn main() {
             let app_cache_dir = app.path().app_cache_dir().unwrap();
             log::info!("App cache dir: {:?}", app_cache_dir);
             fs::create_dir_all(&app_cache_dir).expect("Failed to create app cache directory");
-            APP_CACHE_DIR.set(app_cache_dir.clone()).expect("Failed to set APP_CACHE_DIR");            
+            APP_CACHE_DIR.set(app_cache_dir.clone()).expect("Failed to set APP_CACHE_DIR");
+
+            // Initialize Spotify client with persistent token cache in app data dir
+            let app_data_dir = app.path().app_data_dir().unwrap();
+            fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
+            log::info!("App data dir (spotify token cache): {:?}", app_data_dir);
+            let spotify_client = init_spotify(app_data_dir);
+            let app_state = app.state::<AppState>();
+            *app_state.spotify.blocking_lock() = Some(spotify_client);
+
             if let Err(e) = ensure_hotkey_cache_file_exists(&app_cache_dir) {
                 log::warn!("Failed to initialize hotkey cache file: {}", e);
             }
