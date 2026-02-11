@@ -24,9 +24,9 @@ tauri-plugin-autostart = "2"
 rspotify = { version = "0.13.3", default-features = false, features = ["client-reqwest", "reqwest-rustls-tls"] }
 tokio = "1.42.0"
 
-[target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["winsock2"] }
-
 # Required for hotkey
 global-hotkey = "0.6.3"
 crossbeam-channel = "0.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["winsock2"] }
