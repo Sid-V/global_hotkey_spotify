@@ -1,7 +1,7 @@
-use rspotify::{prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth};
+use rspotify::{prelude::*, scopes, AuthCodePkceSpotify, Config, Credentials, OAuth};
 use serde::Serialize;
 use std::{
-    env::temp_dir, io::{BufRead, BufReader, Write}, net::TcpListener, sync::Once, thread
+    io::{BufRead, BufReader, Write}, net::TcpListener, path::PathBuf, sync::Once, thread
 };
 use tauri::{AppHandle, Emitter, State};
 use urlencoding::decode;
@@ -25,7 +25,6 @@ struct SpotifyAuthPayload {
 }
 
 const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
-const CLIENT_SECRET: &str = "5f5aeaf0488a4e179f3f764c8f7a3b98";
 const SPOTIFY_TOKEN_CACHE: &str = ".spotify_token.json";
 
 #[derive(Serialize)]
@@ -35,20 +34,17 @@ pub enum AuthResult {
     Error { message: String },
 }
 
-pub fn init_spotify() -> AuthCodeSpotify {
+pub fn init_spotify(cache_dir: PathBuf) -> AuthCodePkceSpotify {
     
-    log::info!("Init_Spotify: Initiliazing spotify oauth object");
+    log::info!("Init_Spotify: Initializing spotify oauth (PKCE) object");
+    log::info!("Init_Spotify: Token cache path: {:?}", cache_dir.join(SPOTIFY_TOKEN_CACHE));
     
     let config = Config {
         token_cached: true,
         token_refreshing: true,
-        cache_path:  temp_dir().join(SPOTIFY_TOKEN_CACHE),
+        cache_path: cache_dir.join(SPOTIFY_TOKEN_CACHE),
         ..Default::default()
     };
-    
-    // TODO - Try to put it in the same spot as the Hotkeys cache
-    // issue- appstate.default() runs before we set APP_CACHE_DIR so this init_spotify method errors out
-    // APP_CACHE_DIR.get().expect("spotify: APP_CACHE_DIR not initialized").join(SPOTIFY_TOKEN_CACHE), 
 
     let api_scopes = scopes!(
         "user-read-email",
@@ -61,15 +57,15 @@ pub fn init_spotify() -> AuthCodeSpotify {
         "user-modify-playback-state"
     );
 
-    let creds = Credentials::new(CLIENT_ID, CLIENT_SECRET);
+    let creds = Credentials::new_pkce(CLIENT_ID);
 
     let oauth = OAuth {
         scopes: api_scopes,
-        redirect_uri: "http://localhost:8888/callback".to_owned(),
+        redirect_uri: "http://127.0.0.1:8888/callback".to_owned(),
         ..Default::default()
     };
 
-    AuthCodeSpotify::with_config(creds, oauth, config)
+    AuthCodePkceSpotify::with_config(creds, oauth, config)
 }
 
 fn start_callback_server(app_handle: AppHandle) {
@@ -171,8 +167,8 @@ pub async fn init_auth(app_handle: tauri::AppHandle, state: State<'_, AppState>)
 
     log::debug!("Init_Auth: Called");
 
-    let spotify_lock = state.spotify.lock().await;
-    let spotify = spotify_lock.as_ref().unwrap();
+    let mut spotify_lock = state.spotify.lock().await;
+    let spotify = spotify_lock.as_mut().unwrap();
     // Check for existing token
     if let Ok(Some(token)) = spotify.read_token_cache(true).await {
         
@@ -202,8 +198,8 @@ pub async fn init_auth(app_handle: tauri::AppHandle, state: State<'_, AppState>)
         }
     }
 
-    // No valid token, start new auth flow
-    let url = spotify.get_authorize_url(true).unwrap();
+    // No valid token, start new auth flow (PKCE: get_authorize_url needs &mut self to store verifier)
+    let url = spotify.get_authorize_url(None).unwrap();
 
     Ok(AuthResult::NeedsAuth {
         url: url.to_string(),
