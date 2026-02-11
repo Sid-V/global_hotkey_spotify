@@ -1,31 +1,125 @@
 use rspotify::{prelude::*, scopes, AuthCodePkceSpotify, Config, Credentials, OAuth};
 use serde::Serialize;
 use std::{
-    io::{BufRead, BufReader, Write}, net::TcpListener, path::PathBuf, sync::Once, thread
+    io::{BufRead, BufReader, Write}, net::TcpListener, path::{Path, PathBuf}, sync::Once, thread
 };
 use tauri::{AppHandle, Emitter, State};
 use urlencoding::decode;
 
 #[cfg(target_os = "windows")]
-use winapi::um::winsock2::WSAStartup;
+use winapi::um::winsock2::{WSAStartup, WSACleanup, WSADATA};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::WORD;
+#[cfg(target_os = "windows")]
+use winapi::shared::winerror::NO_ERROR;
 
 #[cfg(target_os = "windows")]
 fn makeword(low: u8, high: u8) -> WORD {
     ((high as WORD) << 8) | (low as WORD)
 }
 
+// RAII wrapper for Windows Sockets initialization
+#[cfg(target_os = "windows")]
+struct WsaGuard {
+    _initialized: bool,
+}
+
+#[cfg(target_os = "windows")]
+impl WsaGuard {
+    fn new() -> Result<Self, std::io::Error> {
+        use std::mem::MaybeUninit;
+        
+        unsafe {
+            let mut wsa_data: MaybeUninit<WSADATA> = MaybeUninit::uninit();
+            let result = WSAStartup(makeword(2, 2), wsa_data.as_mut_ptr());
+            
+            if result != NO_ERROR as i32 {
+                log::error!("WSAStartup failed with error: {}", result);
+                return Err(std::io::Error::from_raw_os_error(result));
+            }
+            
+            log::debug!("WSAStartup succeeded");
+            Ok(Self { _initialized: true })
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WsaGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let result = WSACleanup();
+            if result != 0 {
+                log::warn!("WSACleanup failed with error: {}", result);
+            } else {
+                log::debug!("WSACleanup succeeded");
+            }
+        }
+    }
+}
+
 use crate::AppState;
 static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
+
+#[cfg(target_os = "windows")]
+use std::sync::OnceLock;
+#[cfg(target_os = "windows")]
+static WSA_GUARD: OnceLock<WsaGuard> = OnceLock::new();
 
 #[derive(Serialize, Clone)]
 struct SpotifyAuthPayload {
     code: String,
 }
 
-const CLIENT_ID: &str = "919cdcc0a45d420d80f372105f5b96a0";
+const CLIENT_ID: &str = env!("SPOTIFY_CLIENT_ID");
 const SPOTIFY_TOKEN_CACHE: &str = ".spotify_token.json";
+
+// Secure file permissions for token cache
+#[cfg(unix)]
+fn set_secure_permissions(path: &Path) -> std::io::Result<()> {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    
+    let metadata = fs::metadata(path)?;
+    let mut permissions = metadata.permissions();
+    
+    // Set permissions to 0600 (owner read/write only)
+    permissions.set_mode(0o600);
+    fs::set_permissions(path, permissions)?;
+    
+    log::info!("Set secure permissions (0600) on token cache: {:?}", path);
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn set_secure_permissions(path: &Path) -> std::io::Result<()> {
+    use std::ptr;
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::winnt::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
+    use winapi::um::aclapi::SetNamedSecurityInfoW;
+    use winapi::um::accctrl::SE_FILE_OBJECT;
+    
+    // Convert path to wide string for Windows API
+    let wide_path: Vec<u16> = OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    
+    // Note: This is a simplified implementation
+    // A full implementation would create a proper DACL with only current user access
+    // For now, we rely on the file being created in the user's app data directory
+    // which already has restricted access on Windows
+    
+    log::info!("Token cache file permissions rely on Windows app data directory security: {:?}", path);
+    Ok(())
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+fn set_secure_permissions(path: &Path) -> std::io::Result<()> {
+    log::warn!("Secure file permissions not implemented for this platform: {:?}", path);
+    Ok(())
+}
 
 #[derive(Serialize)]
 pub enum AuthResult {
@@ -72,17 +166,37 @@ fn start_callback_server(app_handle: AppHandle) {
     CALLBACK_SERVER.call_once(move || {
         #[cfg(target_os = "windows")]
         {
-            // Initialize WSA
-            let _wsa_data = unsafe {
-                let mut data = std::mem::zeroed();
-                WSAStartup(makeword(2, 2), &mut data);
-                data
-            };
+            // Initialize Windows Sockets with proper error handling
+            match WsaGuard::new() {
+                Ok(guard) => {
+                    if WSA_GUARD.set(guard).is_err() {
+                        log::error!("WSA_GUARD already initialized");
+                        return;
+                    }
+                    log::info!("Windows Sockets initialized successfully");
+                }
+                Err(e) => {
+                    log::error!("Failed to initialize Windows Sockets: {}", e);
+                    log::error!("Callback server will not start. OAuth may not work.");
+                    return;
+                }
+            }
         }
+        
         let thread_app_handle = app_handle.clone();
         thread::spawn(move || {
             let app_handle = thread_app_handle;
-            let listener = TcpListener::bind("127.0.0.1:8888").unwrap();
+            
+            // Bind with proper error handling
+            let listener = match TcpListener::bind("127.0.0.1:8888") {
+                Ok(l) => l,
+                Err(e) => {
+                    log::error!("Callback_server: Failed to bind to 127.0.0.1:8888: {}", e);
+                    log::error!("OAuth callback server will not work. Port may be in use or blocked.");
+                    return;
+                }
+            };
+            
             log::info!("Callback_server: listening on port 8888");
 
             for stream in listener.incoming() {
@@ -126,7 +240,9 @@ fn start_callback_server(app_handle: AppHandle) {
                                 <p>Authentication successful! You can close this window.</p>\
                                 </body></html>");
 
-                            stream.write_all(response.as_bytes()).unwrap();
+                            if let Err(e) = stream.write_all(response.as_bytes()) {
+                                log::warn!("Callback_server: Failed to write response to stream: {}", e);
+                            }
                         }
                     }
                     Err(e) => {
@@ -227,7 +343,15 @@ pub async fn handle_callback(
                 
                 log::debug!("Handle_callback: Attempting to cache token to: {:?}", spotify.config.cache_path);
                 match token.write_cache(&spotify.config.cache_path) {
-                    Ok(_) => log::debug!("Handle_callback: Successfully cached token"),
+                    Ok(_) => {
+                        log::debug!("Handle_callback: Successfully cached token");
+                        
+                        // Set secure file permissions on token cache
+                        if let Err(e) = set_secure_permissions(&spotify.config.cache_path) {
+                            log::warn!("Handle_callback: Failed to set secure permissions on token cache: {}", e);
+                            // Continue - not critical enough to fail the auth flow
+                        }
+                    }
                     Err(e) => log::error!("Handle_callback: Failed to cache token: {}", e),
                 }
             }

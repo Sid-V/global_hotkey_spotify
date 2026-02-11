@@ -72,6 +72,12 @@ async function processAuthCode(code: string) {
 }
 
 const windowCallbackHandler = async (event: MessageEvent) => {
+  // Validate origin for security
+  if (event.origin !== 'http://127.0.0.1:8888') {
+    console.warn('Rejected message from untrusted origin:', event.origin);
+    return;
+  }
+  
   if (event.data.type === "spotify-callback" && event.data.code) {
     await processAuthCode(event.data.code);
   }
