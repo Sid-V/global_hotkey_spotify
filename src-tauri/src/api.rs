@@ -93,18 +93,6 @@ fn set_secure_permissions(path: &Path) -> std::io::Result<()> {
 
 #[cfg(target_os = "windows")]
 fn set_secure_permissions(path: &Path) -> std::io::Result<()> {
-    use std::ptr;
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-    use winapi::um::winnt::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
-    use winapi::um::aclapi::SetNamedSecurityInfoW;
-    use winapi::um::accctrl::SE_FILE_OBJECT;
-    
-    // Convert path to wide string for Windows API
-    let wide_path: Vec<u16> = OsStr::new(path)
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
     
     // Note: This is a simplified implementation
     // A full implementation would create a proper DACL with only current user access
