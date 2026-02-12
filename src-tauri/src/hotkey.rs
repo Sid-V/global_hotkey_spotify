@@ -2,11 +2,14 @@ use global_hotkey::{
     hotkey::{Code, HotKey, Modifiers},
     GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
 };
-use crossbeam_channel::TryRecvError;
+use crossbeam_channel::RecvTimeoutError;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use std::{cell::RefCell, collections::HashMap, fs, path::{Path, PathBuf}};
 use tauri::{Manager, State};
+
+// Constants
+const HOTKEY_POLL_INTERVAL_MS: u64 = 100;
 
 use crate::{AppState, APP_CACHE_DIR};
 use crate::HOTKEY_CACHE;
@@ -230,9 +233,8 @@ fn parse_hotkey(hotkey_str: &str) -> Result<HotKey, String> {
         }
     }
 
-    let code = <Code as CodeExt>::from_str(&key.to_uppercase()).unwrap();
+    let code = <Code as CodeExt>::from_str(&key.to_uppercase())?;
     let hotkey = HotKey::new(Some(modifiers), code);
-    //hotkey.id = rand::random::<u32>();
     Ok(hotkey)
 }
 
@@ -284,22 +286,22 @@ pub fn init_hotkeys(app_handle: tauri::AppHandle) {
         let global_hotkey_receiver = GlobalHotKeyEvent::receiver();
 
         loop {
-            match global_hotkey_receiver.try_recv() {
+            // Use recv_timeout instead of try_recv + sleep to avoid busy-waiting
+            // This blocks efficiently until an event arrives or timeout occurs
+            match global_hotkey_receiver.recv_timeout(Duration::from_millis(HOTKEY_POLL_INTERVAL_MS)) {
                 Ok(event) => {
                     if event.state == HotKeyState::Released {
                         handle_hotkey_event(app_handle_for_hotkey.state(), event.id).await;
                     }
                 }
-                Err(e) => match e {
-                    TryRecvError::Empty => {
-                        // No events, sleep briefly to avoid busy-waiting
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                    }
-                    TryRecvError::Disconnected => {
-                        log::error!("Init_Hotkeys: Hotkey receiver disconnected");
-                        break;
-                    }
-                },
+                Err(RecvTimeoutError::Timeout) => {
+                    // No events within timeout, continue polling
+                    continue;
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    log::error!("Init_Hotkeys: Hotkey receiver disconnected");
+                    break;
+                }
             }
         }
 

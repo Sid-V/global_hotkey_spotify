@@ -21,6 +21,7 @@ pub mod hotkey;
 
 pub const HOTKEY_CACHE: &str = ".hotkey_cache.json";
 pub const LOGS_FILENAME: &str = "global-hotkey-spotify-logs";
+const MAX_LOG_FILE_SIZE: u64 = 100_000;
 pub static APP_CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 // Main state of the app
@@ -47,20 +48,25 @@ fn main() {
             Target::new(TargetKind::Stdout),
             Target::new(TargetKind::LogDir { file_name: Some(LOGS_FILENAME.to_string())})
         ])
-        .level_for("rspotify_http::reqwest", LevelFilter::Off) // Don't need these large logs to be written to file
-        .max_file_size(100000) // 100kb max file size
+        .level_for("rspotify_http::reqwest", LevelFilter::Off)
+        .max_file_size(MAX_LOG_FILE_SIZE)
         .build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             log::info!("Setting up Tauri...");
-            let app_cache_dir = app.path().app_cache_dir().unwrap();
+            let app_cache_dir = app.path().app_cache_dir()
+                .map_err(|e| format!("Failed to get app cache directory: {}", e))?;
             log::info!("App cache dir: {:?}", app_cache_dir);
-            fs::create_dir_all(&app_cache_dir).expect("Failed to create app cache directory");
-            APP_CACHE_DIR.set(app_cache_dir.clone()).expect("Failed to set APP_CACHE_DIR");
+            fs::create_dir_all(&app_cache_dir)
+                .map_err(|e| format!("Failed to create app cache directory: {}", e))?;
+            APP_CACHE_DIR.set(app_cache_dir.clone())
+                .map_err(|_| "APP_CACHE_DIR already set")?;
 
             // Initialize Spotify client with persistent token cache in app data dir
-            let app_data_dir = app.path().app_data_dir().unwrap();
-            fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
+            let app_data_dir = app.path().app_data_dir()
+                .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+            fs::create_dir_all(&app_data_dir)
+                .map_err(|e| format!("Failed to create app data directory: {}", e))?;
             log::info!("App data dir (spotify token cache): {:?}", app_data_dir);
             let spotify_client = init_spotify(app_data_dir);
             let app_state = app.state::<AppState>();
@@ -83,7 +89,7 @@ fn main() {
 
                 let autostart_manager = app.autolaunch();
                 let _ = autostart_manager.enable();
-                log::info!("registered for autostart? {}", autostart_manager.is_enabled().unwrap());
+                log::info!("registered for autostart? {}", autostart_manager.is_enabled().unwrap_or(false));
             }
             
             // Setup hotkeys manager
@@ -91,14 +97,17 @@ fn main() {
             init_hotkeys(app_handle_for_hotkey);
 
             // System Tray setup
-            let quit = MenuItemBuilder::new("Quit").id("quit").build(app).unwrap();
-            let show = MenuItemBuilder::new("Show").id("show").build(app).unwrap();
+            let quit = MenuItemBuilder::new("Quit").id("quit").build(app)
+                .map_err(|e| format!("Failed to build quit menu item: {}", e))?;
+            let show = MenuItemBuilder::new("Show").id("show").build(app)
+                .map_err(|e| format!("Failed to build show menu item: {}", e))?;
             let menuitems = MenuBuilder::new(app)
                 .items(&[&quit, &show])
                 .build()
-                .unwrap();
+                .map_err(|e| format!("Failed to build menu: {}", e))?;
 
-            let main_window = app.get_webview_window("main").unwrap();
+            let main_window = app.get_webview_window("main")
+                .ok_or_else(|| "Failed to get main window".to_string())?;
             // Don't show taskbar icon
             if let Err(err) = main_window.set_skip_taskbar(true) {
                 log::debug!("Failed to mark window as skip_taskbar: {err:?}");
@@ -125,18 +134,27 @@ fn main() {
                   
 
             // Tray icon events
+            let tray_icon = app.default_window_icon()
+                .ok_or_else(|| "Failed to get default window icon".to_string())?
+                .clone();
             let _ = TrayIconBuilder::new()
                 .tooltip("Global Hotkey Spotify")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&menuitems)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
                     "quit" => {
-                        log::info!("Quitting application through tray exit...");
+                        log::info!("Quitting application - performing graceful shutdown...");
+                        // Signal callback server to stop
+                        shutdown_callback_server();
+                        log::info!("Callback server shutdown signaled");
                         app.exit(0)
                     }
                     "show" => {
-                        let window = app.get_webview_window("main").unwrap();
-                        reveal_window(&window);
+                        if let Some(window) = app.get_webview_window("main") {
+                            reveal_window(&window);
+                        } else {
+                            log::error!("Failed to get main window for show action");
+                        }
                     }
                     _ => {
                         log::error!("Menu item event: menu item was not handled");
@@ -149,8 +167,11 @@ fn main() {
                         ..
                     } => {
                         // LEFT CLICK BEHAVIOR
-                        let window = tray_icon.app_handle().get_webview_window("main").unwrap();
-                        reveal_window(&window);
+                        if let Some(window) = tray_icon.app_handle().get_webview_window("main") {
+                            reveal_window(&window);
+                        } else {
+                            log::error!("Failed to get main window for tray click");
+                        }
                     }
                     TrayIconEvent::Click {
                         button: MouseButton::Right,

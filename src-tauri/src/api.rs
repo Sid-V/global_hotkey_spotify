@@ -1,10 +1,17 @@
 use rspotify::{prelude::*, scopes, AuthCodePkceSpotify, Config, Credentials, OAuth};
 use serde::Serialize;
 use std::{
-    io::{BufRead, BufReader, Write}, net::TcpListener, path::{Path, PathBuf}, sync::Once, thread
+    io::{BufRead, BufReader, Write}, net::TcpListener, path::{Path, PathBuf}, sync::Once, thread,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
 use urlencoding::decode;
+
+// Constants
+const CALLBACK_SERVER_PORT: u16 = 8888;
+const CALLBACK_SERVER_ADDR: &str = "127.0.0.1:8888";
+const VOLUME_STEP: u8 = 10;
 
 #[cfg(target_os = "windows")]
 use winapi::um::winsock2::{WSAStartup, WSACleanup, WSADATA};
@@ -59,12 +66,19 @@ impl Drop for WsaGuard {
 }
 
 use crate::AppState;
-static CALLBACK_SERVER: Once = Once::new(); // Only need to run the callback server once
+static CALLBACK_SERVER: Once = Once::new();
+static CALLBACK_SERVER_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
 use std::sync::OnceLock;
 #[cfg(target_os = "windows")]
 static WSA_GUARD: OnceLock<WsaGuard> = OnceLock::new();
+
+/// Signals the callback server to shut down gracefully
+pub fn shutdown_callback_server() {
+    CALLBACK_SERVER_SHUTDOWN.store(true, Ordering::SeqCst);
+    log::info!("Callback server shutdown signaled");
+}
 
 #[derive(Serialize, Clone)]
 struct SpotifyAuthPayload {
@@ -143,7 +157,7 @@ pub fn init_spotify(cache_dir: PathBuf) -> AuthCodePkceSpotify {
 
     let oauth = OAuth {
         scopes: api_scopes,
-        redirect_uri: "http://127.0.0.1:8888/callback".to_owned(),
+        redirect_uri: format!("http://{}/callback", CALLBACK_SERVER_ADDR),
         ..Default::default()
     };
 
@@ -176,20 +190,31 @@ fn start_callback_server(app_handle: AppHandle) {
             let app_handle = thread_app_handle;
             
             // Bind with proper error handling
-            let listener = match TcpListener::bind("127.0.0.1:8888") {
+            let listener = match TcpListener::bind(CALLBACK_SERVER_ADDR) {
                 Ok(l) => l,
                 Err(e) => {
-                    log::error!("Callback_server: Failed to bind to 127.0.0.1:8888: {}", e);
+                    log::error!("Callback_server: Failed to bind to {}: {}", CALLBACK_SERVER_ADDR, e);
                     log::error!("OAuth callback server will not work. Port may be in use or blocked.");
                     return;
                 }
             };
             
-            log::info!("Callback_server: listening on port 8888");
+            // Set non-blocking so we can check shutdown flag
+            if let Err(e) = listener.set_nonblocking(true) {
+                log::warn!("Callback_server: Failed to set non-blocking mode: {}", e);
+            }
+            
+            log::info!("Callback_server: listening on port {}", CALLBACK_SERVER_PORT);
 
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(mut stream) => {
+            loop {
+                // Check shutdown flag
+                if CALLBACK_SERVER_SHUTDOWN.load(Ordering::SeqCst) {
+                    log::info!("Callback_server: Shutdown signal received, stopping server");
+                    break;
+                }
+                
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
                         // Read the request to get the URL with code
                         let buf_reader = BufReader::new(&stream);
                         let request_line = buf_reader.lines().next();
@@ -233,11 +258,17 @@ fn start_callback_server(app_handle: AppHandle) {
                             }
                         }
                     }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        // No incoming connection, sleep briefly and continue
+                        thread::sleep(Duration::from_millis(100));
+                    }
                     Err(e) => {
-                        log::error!("Callback_server: Error: {}", e);
+                        log::error!("Callback_server: Error accepting connection: {}", e);
                     }
                 }
             }
+            
+            log::info!("Callback_server: Server stopped");
         });
     });
 }
@@ -272,13 +303,17 @@ pub async fn init_auth(app_handle: tauri::AppHandle, state: State<'_, AppState>)
     log::debug!("Init_Auth: Called");
 
     let mut spotify_lock = state.spotify.lock().await;
-    let spotify = spotify_lock.as_mut().unwrap();
+    let spotify = spotify_lock.as_mut()
+        .ok_or_else(|| "Init_Auth: Spotify client not initialized".to_string())?;
+    
     // Check for existing token
     if let Ok(Some(token)) = spotify.read_token_cache(true).await {
         
         log::debug!("Init_Auth: Existing token found in Init_Auth");
         
-        *spotify.get_token().lock().await.unwrap() = Some(token.clone());
+        if let Ok(mut token_lock) = spotify.get_token().lock().await {
+            *token_lock = Some(token.clone());
+        }
 
         if token.is_expired() {
             log::debug!("Init_Auth: Token expired, attempting refresh");
@@ -303,7 +338,8 @@ pub async fn init_auth(app_handle: tauri::AppHandle, state: State<'_, AppState>)
     }
 
     // No valid token, start new auth flow (PKCE: get_authorize_url needs &mut self to store verifier)
-    let url = spotify.get_authorize_url(None).unwrap();
+    let url = spotify.get_authorize_url(None)
+        .map_err(|e| format!("Init_Auth: Failed to get authorize URL: {}", e))?;
 
     Ok(AuthResult::NeedsAuth {
         url: url.to_string(),
@@ -327,20 +363,20 @@ pub async fn handle_callback(
         Ok(_) => {
             log::debug!("Handle_callback: Successfully requested token");
             // Successfully got token, try to cache it
-            if let Some(token) = spotify.get_token().lock().await.unwrap().clone() {
-                
-                log::debug!("Handle_callback: Attempting to cache token to: {:?}", spotify.config.cache_path);
-                match token.write_cache(&spotify.config.cache_path) {
-                    Ok(_) => {
-                        log::debug!("Handle_callback: Successfully cached token");
-                        
-                        // Set secure file permissions on token cache
-                        if let Err(e) = set_secure_permissions(&spotify.config.cache_path) {
-                            log::warn!("Handle_callback: Failed to set secure permissions on token cache: {}", e);
-                            // Continue - not critical enough to fail the auth flow
+            if let Ok(token_guard) = spotify.get_token().lock().await {
+                if let Some(token) = token_guard.clone() {
+                    log::debug!("Handle_callback: Attempting to cache token to: {:?}", spotify.config.cache_path);
+                    match token.write_cache(&spotify.config.cache_path) {
+                        Ok(_) => {
+                            log::debug!("Handle_callback: Successfully cached token");
+                            
+                            // Set secure file permissions on token cache
+                            if let Err(e) = set_secure_permissions(&spotify.config.cache_path) {
+                                log::warn!("Handle_callback: Failed to set secure permissions on token cache: {}", e);
+                            }
                         }
+                        Err(e) => log::error!("Handle_callback: Failed to cache token: {}", e),
                     }
-                    Err(e) => log::error!("Handle_callback: Failed to cache token: {}", e),
                 }
             }
 
@@ -376,10 +412,18 @@ pub async fn handle_callback(
 pub async fn check_auth_status(state: State<'_, AppState>) -> Result<AuthResult, String> {
     let spotify_lock = state.spotify.lock().await;
 
-    let spotify = spotify_lock.as_ref().unwrap();
+    let spotify = match spotify_lock.as_ref() {
+        Some(s) => s,
+        None => return Ok(AuthResult::Error {
+            message: "Check_Auth_Status: Spotify client not initialized".to_string(),
+        }),
+    };
+    
     if let Ok(Some(token)) = spotify.read_token_cache(true).await {
         log::debug!("Check_Auth_Status: Found token in cache");
-        *spotify.get_token().lock().await.unwrap() = Some(token.clone());
+        if let Ok(mut token_lock) = spotify.get_token().lock().await {
+            *token_lock = Some(token.clone());
+        }
 
         if token.is_expired() {
             return Ok(AuthResult::Error {
@@ -486,8 +530,8 @@ pub async fn volume_control_up(state: State<'_, AppState>) -> Result<AuthResult,
     let spotify = state.spotify.lock().await;
     let mut volume_lock = state.volume.lock().await;
     if let Some(spotify) = &*spotify {
-        log::info!("Volume_Control_Up: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock + 10).min(100));
-        *volume_lock = (*volume_lock + 10).min(100); // Increase volume by 10, max 100
+        log::info!("Volume_Control_Up: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock + VOLUME_STEP).min(100));
+        *volume_lock = (*volume_lock + VOLUME_STEP).min(100);
         match spotify.volume(*volume_lock, None).await {
             Ok(_) => Ok(AuthResult::Success {
                 ok: "ok".to_string(),
@@ -509,8 +553,8 @@ pub async fn volume_control_down(state: State<'_, AppState>) -> Result<AuthResul
     let spotify = state.spotify.lock().await;
     let mut volume_lock = state.volume.lock().await;
     if let Some(spotify) = &*spotify {
-        log::info!("Volume_Control_Down: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock as i8 - 10).max(0) as u8);  
-        *volume_lock = (*volume_lock as i8 - 10).max(0) as u8; // Decrease volume by 10, min 0
+        log::info!("Volume_Control_Down: Current volume: {:?} | Setting to: {:?}", *volume_lock, (*volume_lock as i8 - VOLUME_STEP as i8).max(0) as u8);  
+        *volume_lock = (*volume_lock as i8 - VOLUME_STEP as i8).max(0) as u8;
         match spotify.volume(*volume_lock, None).await {
             Ok(_) => Ok(AuthResult::Success {
                 ok: "ok".to_string(),
