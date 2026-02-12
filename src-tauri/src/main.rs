@@ -146,7 +146,6 @@ fn main() {
                         log::info!("Quitting application - performing graceful shutdown...");
                         // Signal callback server to stop
                         shutdown_callback_server();
-                        log::info!("Callback server shutdown signaled");
                         app.exit(0)
                     }
                     "show" => {
