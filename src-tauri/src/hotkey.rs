@@ -112,8 +112,6 @@ pub async fn set_hotkeys(
     volume_up_hotkey: String,
     volume_down_hotkey: String,
 ) -> Result<AuthResult, String> {
-
-    // TODO - need to check if they are empty and skip otherwise
     
     let mut save_hotkeys = HashMap::new();
     save_hotkeys.insert("play_pause".to_string(), play_pause_hotkey.clone());

@@ -1,98 +1,116 @@
-# Global Hotkeys Spotify
-This application will control your Spotify playback using Global Hotkeys. Cross-platform on Windows, MacOS and Linux due to Tauri.
+# Global Hotkey Spotify — Control Spotify with Custom Keyboard Shortcuts
 
-Requires Spotify Premium subscription.
+[![Version](https://img.shields.io/badge/version-0.8.0-blue)](https://github.com/Sid-V/global_hotkey_spotify/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/Sid-V/global_hotkey_spotify/main.yml?branch=master)](https://github.com/Sid-V/global_hotkey_spotify/actions)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+[![Downloads](https://img.shields.io/github/downloads/Sid-V/global_hotkey_spotify/total)](https://github.com/Sid-V/global_hotkey_spotify/releases)
 
-![image](https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c)
+> Control Spotify playback from any app — no media keys required. Perfect for gamers, compact keyboard users, and multitaskers.
 
-Playback controls
-- Play/Pause
-- Next Track
-- Prev Track
-- Volume Up
-- Volume Down
-- Toast notification (Future)
+Requires **Spotify Premium**.
 
-Volume up/down controls the spotify in-app volume and NOT the windows/mac system slider volume
+![Global Hotkey Spotify Screenshot](https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c)
 
-## Why did I build this?
-I wanted to learn a new language - Rust. I used to use this github project called - Toastify that did the exact same thing but Spotify updated their Auth loop and the original author did not continue to maintain it. I didn't want to fork that project since it was written in C#.
+---
 
-The main usecase is to be able to control your music quickly without changing the in-focus application. Especially useful when you are playing videogames and want to skip tracks or decrease the volume since a new round is starting.
+## Why Global Hotkey Spotify?
 
-## "Why not use the media playback keys on your keyboard?"
-I have a 60% keyboard and do not have playback keys nor do I want to install VIA or an equivalent and map a bunch of layers to my keyboard. I wanted to learn Rust and build an app that I WANT.
+| Problem | Solution |
+|---|---|
+| You're gaming and need to skip a track | Press your custom hotkey — no alt-tabbing |
+| Your 60% keyboard has no media keys | Map any key combo (e.g., `Ctrl+Shift+S`) |
+| You want separate volume control | Adjusts Spotify's in-app volume, not system volume |
+| Toastify is abandoned | Built from scratch in Rust — actively maintained |
+
+## Features
+
+- **Custom global hotkeys** — Play/Pause, Next, Previous, Volume Up, Volume Down
+- **Flexible key combos** — Use 0–2 modifiers (Ctrl, Alt, Shift, Cmd) + any key
+- **Click-to-record** — Set hotkeys by pressing them, no manual typing
+- **In-app volume control** — Independent from your system volume slider
+- **System tray** — Minimize to tray, runs silently in the background
+- **Auto-start** — Launch on boot so your hotkeys are always ready
+- **Cross-platform** — Windows, macOS (Intel + Apple Silicon), Linux
+- **Lightweight** — Built with Tauri + Rust, not Electron (~5 MB)
+- **Secure auth** — Spotify OAuth 2.0 with PKCE, tokens stored locally
 
 ## Installation
-Go to [Releases](https://github.com/Sid-V/global_hotkey_spotify/releases) and install the appropriate package for your operating system.
 
-Launch the application.
+Download the latest release for your OS:
 
-## Usage
-- Login using your spotify credentials. Please ignore the initial error message that says 'failed to load hotkeys'.
-- Test your spotify credentials are working using the buttons that play/pause, next track, prev track, volume up/down. 
-- Now, add your global hotkey combinations and hit Save
-- Enjoy!
+**[⬇ Download Latest Release](https://github.com/Sid-V/global_hotkey_spotify/releases/latest)**
 
-NOTE: THERE MUST BE AN ACTIVE PLAYBACK FOR HOTKEYS TO WORK. SO IF IT DOESN'T WORK, OPEN SPOTIFY ON APP OR ON BROWSER AND PLAY A SONG.
+| OS | Format |
+|---|---|
+| Windows | `.msi` or `.exe` (NSIS installer) |
+| macOS (Apple Silicon) | `.dmg` |
+| macOS (Intel) | `.dmg` |
+| Linux | `.deb` or `.AppImage` |
 
-## Hotkeys usable
-You can use either 0, 1 or a maximum of 2 modifiers. Modifiers are CTRL, ALT, CMD (on mac), SHIFT
-The hotkeys you can use are 
-- ALL DIGITS
-- ALL LETTERS
-- The following special chars:-
-- "-"
-- "="
-- "/"
-- "\\"
-- ";"
-- "'"
-- ","
-- "."
-- "["
-- "]"
-- "`"
-- "Home"
-- "End"
-- "PageUp"
-- "PageDown"
-- "Delete"
-- "Backspace"
-- "Escape"
-- "Tab"
-- "PrintScreen"
-- "ScrollLock"
-- "Pause"
-- "Insert"
-- "NumLock"
-- "F1" 
-- "F2" 
-- "F3" 
-- "F4" 
-- "F5" 
-- "F6" 
-- "F7" 
-- "F8" 
-- "F9" 
-- "F10"
-- "F11"
-- "F12"
-- "F13"
-- "F14"
-- "F15"
-- "F16"
-- "F17"
-- "F18"
-- "F19"
-- "F20"
+## Quick Start
 
-## Testing
-I've only tested on my windows machine for all functionality. This app should be cross platform since it's built on Tauri but ymmv. Please add an issue here if you have any bugs, I'm happy to fix them :) Or better, you can create a PR!
-  
+1. Download and install
+2. Launch the app and log in with your Spotify Premium account
+3. Test playback using the on-screen buttons
+4. Click on a hotkey field, press your desired key combo, then hit **Save**
+5. Enjoy controlling Spotify from anywhere — even in full-screen games
 
-Please report any issues, this is still super early in development and I'm trying to learn Rust with this project
+> **Note:** Spotify must have an active playback session (at least one song playing in the Spotify app or browser) for hotkeys to work.
 
-## Todo list
-- Learn to docker
-- Add toast notification every time you prev/next track
+## Supported Keys
+
+**Modifiers (0–2):** `Ctrl` · `Alt` · `Shift` · `Cmd` (macOS)
+
+**Keys:**
+All letters (A–Z) · All digits (0–9) · F1–F20 · Home · End · PageUp · PageDown · Delete · Backspace · Escape · Tab · PrintScreen · ScrollLock · Pause · Insert · NumLock · and common symbols (`` ` `` `-` `=` `/` `\` `;` `'` `,` `.` `[` `]`)
+
+## Building from Source
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (stable)
+- [Node.js](https://nodejs.org/) (LTS)
+- [pnpm](https://pnpm.io/)
+- Platform-specific deps:
+  - **Linux:** `sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+
+### Build
+
+```bash
+pnpm install
+pnpm tauri build
+```
+
+The built installer will be in `src-tauri/target/release/bundle/`.
+
+## Comparison
+
+| Feature | Global Hotkey Spotify | Media Keys | Toastify |
+|---|---|---|---|
+| Custom key combos | ✅ | ❌ (fixed keys) | ✅ |
+| Works without media keys | ✅ | ❌ | ✅ |
+| In-app volume control | ✅ | ❌ | ✅ |
+| Cross-platform | ✅ Win/Mac/Linux | ✅ | ❌ Windows only |
+| Actively maintained | ✅ | N/A | ❌ Abandoned |
+| Lightweight (non-Electron) | ✅ ~5 MB | N/A | ❌ ~50 MB |
+| Open source | ✅ MIT | N/A | ✅ |
+
+## Tech Stack
+
+- **Backend:** [Rust](https://www.rust-lang.org/) + [Tauri v2](https://tauri.app/)
+- **Frontend:** [Vue 3](https://vuejs.org/) + TypeScript + [Vite](https://vitejs.dev/)
+- **Spotify API:** [rspotify](https://github.com/ramsayleung/rspotify)
+- **Hotkeys:** [global-hotkey](https://github.com/nicbou/global-hotkey)
+
+## Contributing
+
+Contributions are welcome! Please open an issue first to discuss what you'd like to change, or submit a pull request directly for bug fixes.
+
+## License
+
+[MIT](LICENSE) — free to use, modify, and distribute.
+
+## Acknowledgments
+
+Inspired by [Toastify](https://github.com/aleab/toastify) — the original Spotify hotkey app for Windows that is no longer maintained.

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Hotkey Spotify — Custom Keyboard Shortcuts for Spotify</title>
+    <meta name="description" content="Control Spotify playback with custom global keyboard shortcuts. No media keys needed. Perfect for gamers and compact keyboard users. Free, open-source, cross-platform.">
+    <meta name="keywords" content="spotify, global hotkeys, keyboard shortcuts, spotify controller, control spotify while gaming, 60% keyboard, media keys alternative, spotify hotkeys, tauri, rust">
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Global Hotkey Spotify — Custom Keyboard Shortcuts for Spotify">
+    <meta property="og:description" content="Control Spotify playback from any app with custom hotkeys. No media keys needed. Free & open-source.">
+    <meta property="og:url" content="https://sid-v.github.io/global_hotkey_spotify/">
+    <meta property="og:image" content="https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Global Hotkey Spotify — Custom Keyboard Shortcuts for Spotify">
+    <meta name="twitter:description" content="Control Spotify playback from any app with custom hotkeys. No media keys needed.">
+    <meta name="twitter:image" content="https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Global Hotkey Spotify",
+        "operatingSystem": "Windows, macOS, Linux",
+        "applicationCategory": "MultimediaApplication",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Control Spotify playback with custom global keyboard shortcuts. No media keys needed.",
+        "url": "https://sid-v.github.io/global_hotkey_spotify/",
+        "downloadUrl": "https://github.com/Sid-V/global_hotkey_spotify/releases/latest",
+        "softwareVersion": "0.8.0",
+        "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
+
+    <style>
+        :root {
+            --green: #1DB954;
+            --green-dark: #1aa34a;
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --border: #30363d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        a { color: var(--green); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 20px 60px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hero h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+        .hero h1 span { color: var(--green); }
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: var(--green);
+            color: #000;
+        }
+        .btn-primary:hover { background: var(--green-dark); text-decoration: none; }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--text-muted); text-decoration: none; }
+
+        /* Screenshot */
+        .screenshot {
+            text-align: center;
+            padding: 0 20px 60px;
+        }
+        .screenshot img {
+            max-width: 600px;
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+        }
+
+        /* Features */
+        .features {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        .features h2 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 40px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .feature-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .feature-icon {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+        }
+
+        /* Use Cases */
+        .usecases {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        .usecases h2 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 40px;
+        }
+        .usecase-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        .usecase-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+        .usecase-card .emoji { font-size: 2rem; margin-bottom: 12px; }
+        .usecase-card h3 { margin-bottom: 8px; }
+        .usecase-card p { color: var(--text-muted); font-size: 0.9rem; }
+
+        /* Downloads */
+        .downloads {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .downloads h2 {
+            font-size: 1.8rem;
+            margin-bottom: 12px;
+        }
+        .downloads .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .download-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .download-card h3 { margin-bottom: 4px; }
+        .download-card p { color: var(--text-muted); font-size: 0.85rem; }
+
+        /* Comparison */
+        .comparison {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        .comparison h2 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 32px;
+        }
+        .comparison table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        .comparison th, .comparison td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .comparison th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .comparison td:first-child { font-weight: 500; }
+
+        /* FAQ */
+        .faq {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        .faq h2 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 32px;
+        }
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+            padding: 20px 0;
+        }
+        .faq-item h3 { margin-bottom: 8px; font-size: 1.05rem; }
+        .faq-item p { color: var(--text-muted); }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        footer a { color: var(--text-muted); }
+
+        /* Tech badges */
+        .tech-badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 24px;
+            padding-bottom: 20px;
+        }
+        .tech-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 1.8rem; }
+            .hero p { font-size: 1rem; }
+            .btn { padding: 12px 20px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Control Spotify with<br><span>Custom Keyboard Shortcuts</span></h1>
+        <p>Skip tracks, adjust volume, and play/pause Spotify from any app — even full-screen games. No media keys needed.</p>
+        <div class="hero-buttons">
+            <a href="https://github.com/Sid-V/global_hotkey_spotify/releases/latest" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Free
+            </a>
+            <a href="https://github.com/Sid-V/global_hotkey_spotify" class="btn btn-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                View on GitHub
+            </a>
+        </div>
+        <div class="tech-badges">
+            <span class="tech-badge">Rust</span>
+            <span class="tech-badge">Tauri v2</span>
+            <span class="tech-badge">Vue 3</span>
+            <span class="tech-badge">MIT License</span>
+            <span class="tech-badge">~5 MB</span>
+        </div>
+    </section>
+
+    <!-- Screenshot -->
+    <section class="screenshot">
+        <img src="https://github.com/user-attachments/assets/7376b75f-b42a-4529-84d6-39297598f10c" alt="Global Hotkey Spotify app screenshot showing hotkey configuration interface" loading="lazy">
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <h2>Everything You Need</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#9000;</div>
+                <h3>Custom Key Combos</h3>
+                <p>Map any key combination with up to 2 modifiers. Ctrl+Shift+S, Alt+F9 — whatever works for you.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#127925;</div>
+                <h3>In-App Volume Control</h3>
+                <p>Adjust Spotify's volume independently from your system volume. Perfect for balancing game audio.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128293;</div>
+                <h3>Click-to-Record</h3>
+                <p>Just click a field and press your desired key combo. No manual typing or config file editing.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128187;</div>
+                <h3>Cross-Platform</h3>
+                <p>Works on Windows, macOS (Intel + Apple Silicon), and Linux. One app, every desktop.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128640;</div>
+                <h3>Lightweight</h3>
+                <p>Built with Tauri + Rust — not Electron. Only ~5 MB installed. Minimal CPU and memory usage.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128274;</div>
+                <h3>Secure by Default</h3>
+                <p>Spotify OAuth 2.0 with PKCE. Tokens stored locally. No data sent to third parties.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="usecases">
+        <h2>Built For You</h2>
+        <div class="usecase-grid">
+            <div class="usecase-card">
+                <div class="emoji">&#127918;</div>
+                <h3>Gamers</h3>
+                <p>Skip tracks or lower Spotify volume mid-match without alt-tabbing out of your game.</p>
+            </div>
+            <div class="usecase-card">
+                <div class="emoji">&#9000;</div>
+                <h3>Compact Keyboard Users</h3>
+                <p>60% or 65% keyboard with no media keys? Map Spotify controls to any key combo you want.</p>
+            </div>
+            <div class="usecase-card">
+                <div class="emoji">&#128188;</div>
+                <h3>Multitaskers</h3>
+                <p>Control music without switching windows. Stay focused on your work, code, or creative flow.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Downloads -->
+    <section class="downloads" id="download">
+        <h2>Download</h2>
+        <p class="subtitle">Free and open source. Always will be.</p>
+        <div class="download-grid">
+            <div class="download-card">
+                <h3>Windows</h3>
+                <p>.msi or .exe installer</p>
+            </div>
+            <div class="download-card">
+                <h3>macOS</h3>
+                <p>.dmg (Intel & Apple Silicon)</p>
+            </div>
+            <div class="download-card">
+                <h3>Linux</h3>
+                <p>.deb or .AppImage</p>
+            </div>
+        </div>
+        <br>
+        <a href="https://github.com/Sid-V/global_hotkey_spotify/releases/latest" class="btn btn-primary">
+            Download Latest Release
+        </a>
+    </section>
+
+    <!-- Comparison -->
+    <section class="comparison">
+        <h2>How It Compares</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Global Hotkey Spotify</th>
+                    <th>Media Keys</th>
+                    <th>Toastify</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Custom key combos</td><td>&#10003;</td><td>&#10007;</td><td>&#10003;</td></tr>
+                <tr><td>Works without media keys</td><td>&#10003;</td><td>&#10007;</td><td>&#10003;</td></tr>
+                <tr><td>In-app volume control</td><td>&#10003;</td><td>&#10007;</td><td>&#10003;</td></tr>
+                <tr><td>Cross-platform</td><td>&#10003; Win/Mac/Linux</td><td>&#10003;</td><td>&#10007; Windows only</td></tr>
+                <tr><td>Actively maintained</td><td>&#10003;</td><td>N/A</td><td>&#10007; Abandoned</td></tr>
+                <tr><td>Lightweight</td><td>~5 MB</td><td>N/A</td><td>~50 MB</td></tr>
+                <tr><td>Open source</td><td>&#10003; MIT</td><td>N/A</td><td>&#10003;</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq">
+        <h2>FAQ</h2>
+        <div class="faq-item">
+            <h3>Do I need Spotify Premium?</h3>
+            <p>Yes. The Spotify Web API requires a Premium account to control playback.</p>
+        </div>
+        <div class="faq-item">
+            <h3>Why don't my hotkeys work?</h3>
+            <p>Spotify must have an active playback session. Open the Spotify app or web player and start playing a song first, then your hotkeys will work.</p>
+        </div>
+        <div class="faq-item">
+            <h3>Does it work during full-screen games?</h3>
+            <p>Yes! The hotkeys are registered at the OS level and work even when other apps are in full-screen exclusive mode.</p>
+        </div>
+        <div class="faq-item">
+            <h3>Is my Spotify account safe?</h3>
+            <p>Yes. Authentication uses Spotify's official OAuth 2.0 with PKCE flow. Your credentials are never seen by the app — you log in directly on Spotify's website. Tokens are stored locally on your machine.</p>
+        </div>
+        <div class="faq-item">
+            <h3>How is this different from keyboard media keys?</h3>
+            <p>Media keys are fixed physical keys that not all keyboards have (especially 60% and compact layouts). This app lets you assign any key combination you want.</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>
+            <a href="https://github.com/Sid-V/global_hotkey_spotify">GitHub</a> &middot;
+            <a href="https://github.com/Sid-V/global_hotkey_spotify/releases">Releases</a> &middot;
+            <a href="https://github.com/Sid-V/global_hotkey_spotify/issues">Report a Bug</a>
+        </p>
+        <p style="margin-top: 8px;">MIT License &middot; Made with Rust + Tauri</p>
+    </footer>
+
+</body>
+</html>

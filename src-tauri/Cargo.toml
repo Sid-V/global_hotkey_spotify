@@ -1,6 +1,6 @@
 [package]
 name = "global-hotkey-spotify"
-version = "0.6.0"
+version = "0.8.0"
 description = "A Tauri App"
 authors = ["sidv"]
 edition = "2024"

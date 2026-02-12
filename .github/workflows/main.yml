@@ -56,9 +56,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-          releaseName: 'Global Hotkeys spotify v__VERSION__'
-          releaseBody: 'Install the correct version depending on your operating system.'
-          releaseDraft: true
+          tagName: app-v__VERSION__
+          releaseName: 'Global Hotkey Spotify v__VERSION__'
+          releaseBody: |
+            ## Global Hotkey Spotify v__VERSION__
+
+            Control Spotify with custom global keyboard shortcuts — no media keys needed.
+
+            ### Installation
+            Download the installer for your OS below:
+            | OS | File |
+            |---|---|
+            | Windows | `.msi` or `.exe` |
+            | macOS (Apple Silicon) | `_aarch64.dmg` |
+            | macOS (Intel) | `_x64.dmg` |
+            | Linux | `.deb` or `.AppImage` |
+
+            ### Requirements
+            - Spotify Premium account
+            - Active Spotify playback session
+
+            [Full README & Docs](https://github.com/Sid-V/global_hotkey_spotify)
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
