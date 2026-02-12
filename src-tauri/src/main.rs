@@ -21,7 +21,7 @@ pub mod hotkey;
 
 pub const HOTKEY_CACHE: &str = ".hotkey_cache.json";
 pub const LOGS_FILENAME: &str = "global-hotkey-spotify-logs";
-const MAX_LOG_FILE_SIZE: u64 = 100_000;
+const MAX_LOG_FILE_SIZE: u128 = 100_000;
 pub static APP_CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 // Main state of the app
