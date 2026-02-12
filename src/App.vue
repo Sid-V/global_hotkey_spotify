@@ -34,7 +34,6 @@ interface SpotifyAuthEvent {
 
 let unlistenAuthEvent: UnlistenFn | null = null;
 let windowCallbackRegistered = false;
-let authStatusInterval: number | null = null;
 
 async function launchSpotifyAuthWindow(url: string) {
   try {
@@ -310,10 +309,8 @@ onMounted(async () => {
     await processAuthCode(event.payload.code);
   });
   
-  // Check auth status every 10 mins
-  authStatusInterval = window.setInterval(async () => {
-    await checkAuthStatus();
-  }, 600000);
+  // Auth status is now checked on-demand before API calls rather than polling
+  // This reduces unnecessary network requests
 });
 
 onUnmounted(() => {
@@ -325,11 +322,6 @@ onUnmounted(() => {
   if (windowCallbackRegistered) {
     window.removeEventListener("message", windowCallbackHandler);
     windowCallbackRegistered = false;
-  }
-
-  if (authStatusInterval) {
-    clearInterval(authStatusInterval);
-    authStatusInterval = null;
   }
 });
 
